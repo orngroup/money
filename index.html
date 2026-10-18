@@ -6,12 +6,12 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Kawa Budget Platform</title>
+<title>MoneyHub – The Kawa Family</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Kawa Budget">
+<meta name="apple-mobile-web-app-title" content="MoneyHub">
 <meta name="theme-color" content="#0f5c4a">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-180.png">
@@ -75,10 +75,11 @@ nav.side button,nav.bottom button{display:flex;align-items:center;gap:10px;width
 nav.side button.on{background:var(--accent-soft);color:var(--accent)}
 nav.side svg,nav.bottom svg{width:18px;height:18px;flex:none}
 main{padding-block:18px 90px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0;max-width:1180px;width:100%}
-nav.bottom{display:none;position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--card);border-top:1px solid var(--line);padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));grid-template-columns:repeat(6,1fr)}
-nav.bottom button{flex-direction:column;gap:3px;font-size:10px;padding:6px 2px;justify-content:center;text-align:center}
+nav.bottom{display:none;position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--card);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
+nav.bottom button{flex:0 0 66px;width:66px}
+nav.bottom button{flex-direction:column;gap:3px;font-size:9px;padding:6px 1px;justify-content:center;text-align:center}
 nav.bottom button.on{color:var(--accent)}
-@media (max-width:860px){ .shell{grid-template-columns:1fr} nav.side{display:none} nav.bottom{display:grid} main{padding-block:14px 96px} }
+@media (max-width:860px){ .brand .small{display:none} .shell{grid-template-columns:1fr} nav.side{display:none} nav.bottom{display:flex} main{padding-block:14px 96px} }
 
 /* cards + grids */
 .grid{display:grid;gap:14px}
@@ -169,7 +170,7 @@ details summary{cursor:pointer;font-weight:700;font-family:var(--display);paddin
 
 <div id="login" class="login">
   <form class="box" id="loginForm">
-    <div class="logo"><span class="k">K</span><div><h1>Kawa Budget Platform</h1><div class="muted small">Household budget · from 1 September 2026</div></div></div>
+    <div class="logo"><span class="k">M</span><div><h1>MoneyHub</h1><div class="muted small">The Kawa Family · household budget from 1 September 2026</div></div></div>
     <label>Who is this? <select id="loginUser"><option>Ajay Kawa</option><option>Louise Hadi</option></select></label>
     <label>PIN <input id="loginPin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" placeholder="4-digit PIN"></label>
     <div class="err" id="loginErr"></div>
@@ -180,7 +181,7 @@ details summary{cursor:pointer;font-weight:700;font-family:var(--display);paddin
 
 <div id="app" class="hide">
   <div class="topbar">
-    <div class="brand"><span class="k">K</span>Kawa Budget</div>
+    <div class="brand"><span class="k">M</span>MoneyHub <span class="small" style="font-weight:500;opacity:.8">· The Kawa Family</span></div>
     <div class="spacer"></div>
     <div class="who"><span class="sync" id="syncDot" title="Sync status"></span><span id="whoName"></span><button id="switchUser">Switch</button></div>
   </div>
@@ -629,14 +630,17 @@ const CATS = [
   ['Food & Groceries', 'variable', 'c10'], ['Lunch & Coffee', 'variable', 'c9'], ['Eating Out & Takeaway', 'variable', 'c2'], ['Car & Fuel', 'variable', 'c3'],
   ['Travel & Parking', 'variable', 'c6'], ['Parking Fines & Penalties', 'variable', 'c5'], ['Kids & School', 'variable', 'c4'], ['Clothing & Shopping', 'variable', 'c2'],
   ['Beauty & Health', 'variable', 'c4'], ['Entertainment', 'variable', 'c9'], ['Gifts & Charity', 'variable', 'c6'], ['Business Contractors & Services', 'variable', 'c7'],
-  ['Cash & Other', 'variable', 'c8'], ['To categorise', 'variable', 'c8'],
+  ['Cash & Other', 'variable', 'c8'], ['Mobile Phone', 'fixed', 'c3'], ['Family Loan', 'fixed', 'c5'], ['Work Expense', 'variable', 'c7'], ['To categorise', 'variable', 'c8'],
   ['Transfer (internal)', 'transfer', 'c8'], ['Credit Card Payment', 'transfer', 'c8'], ['Pay to ourselves', 'transfer', 'c8'], ['Money in – unexplained', 'transfer', 'c8'],
 ];
-const CAT = Object.fromEntries(CATS.map(c => [c[0], { group: c[1], color: c[2] }]));
+const BASE_CAT = Object.fromEntries(CATS.map(c => [c[0], { group: c[1], color: c[2] }]));
+const CAT = new Proxy({}, { get: (_, name) => BASE_CAT[name] || ((state.customCats || []).find(c => c.name === name) ? { group: (state.customCats.find(c => c.name === name)).group, color: 'c' + (1 + Math.abs(hashStr(name)) % 10) } : undefined), has: (_, name) => !!CAT[name] });
+function hashStr(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return h; }
+const allCats = () => CATS.map(c => c[0]).concat((state.customCats || []).map(c => c.name));
 const catGroup = c => (CAT[c] || CAT['To categorise']).group;
 const catColor = c => `var(--${(CAT[c] || CAT['To categorise']).color})`;
 
-/* rule: [regex on "ACCOUNT|PAYEE|REF", category, flags]  flags: r = recurring, o = one-off */
+/* rule: [regex on "ACCOUNT|PAYEE|REF", category, flags]  flags: r = regular, o = one-off, x = work expense (reclaimable) */
 const RULES = [
   // income
   [/ORN NEXUS/, 'Income', 'r'], [/ITRAVELMIX/, 'Income', 'r'], [/WINGMAN GROUP/, 'Income'], [/^ajay_hsbc\|AVIVAC/, 'Income (one-off)', 'o'], [/^ajay_hsbc\|J CHEBICHI/, 'Money in – unexplained', 'o'],
@@ -661,7 +665,8 @@ const RULES = [
   [/ADMIRAL INSURANCE|STAYSURE/, 'Insurance', 'r'], [/L&G INSURANCE/, 'Insurance', 'r'], [/AVIVA LIFE/, 'Life Insurance', 'r'],
   [/TAXASSIST|COMPANIESHOUSE|FREEAGENT/, 'Accountancy & Company', 'r'], [/^thinc\|EXPERIAN/, 'Business Software & Tools', 'r'],
   [/SKY TV|SPOTIFY|TV LICENCE|PRIME VIDEO|AMAZON PRIME|APPLE\.COM BILL|GOOGLE PLAY|GOOGLE ONE|GOOGLE \*GOOGLE PLA|OURTAAP|NOW TV|NETFLIX|DISNEY/, 'TV & Subscriptions', 'r'],
-  [/ANTHROPIC|OPENAI|GOOGLE CLOUD|GOOGLE WORKSPACE|GOOGLE G1SK|MICROSOFT|CANVA|MAILCHIMP|SHOPIFY|GODADDY|WIX\.COM|POSTPLANNER|LOVABLE|TESTERS COMMUNITY|CODE HOSPITALITY|SHIELDGPS|ZILCH MSFT|METFOLIO|SP EXTRACTED|EBAY COMMERCE/, 'Business Software & Tools', 'r'],
+  [/ANTHROPIC/, 'Business Software & Tools', 'rx'],
+  [/OPENAI|GOOGLE CLOUD|GOOGLE WORKSPACE|GOOGLE G1SK|MICROSOFT|CANVA|MAILCHIMP|SHOPIFY|GODADDY|WIX\.COM|POSTPLANNER|LOVABLE|TESTERS COMMUNITY|CODE HOSPITALITY|SHIELDGPS|ZILCH MSFT|METFOLIO|SP EXTRACTED|EBAY COMMERCE/, 'Business Software & Tools', 'r'],
   [/REVOLUT BUSINESS FEE|ACCOUNT MAINTENANCE|TRANSACTION CHARGES|NON-STERLING|INTEREST/, 'Bank Fees & Interest', 'r'],
   [/HMRC|VAT/, 'Tax & VAT'],
   [/GOCARDLESS/, 'To categorise', 'r'], [/LFO NO 12/, 'To categorise', 'r'], [/ICON COLLECTIONS/, 'To categorise', 'r'], [/^thinc\|A HADI/, 'To categorise', 'r'],
@@ -695,8 +700,9 @@ function ruleFor(tx) {
 
 /* ---------------- state ---------------- */
 const SEED = JSON.parse($('#seedData').textContent);
-const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09' };
-let state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], settings: Object.assign({}, DEFAULT_SETTINGS), updatedAt: 0 };
+const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
+const TYPES = [['regular', 'Regular'], ['everyday', 'Everyday'], ['oneoff', 'One-off'], ['unexpected', 'Unexpected']];
+let state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], customCats: [], plan: {}, settings: Object.assign({}, DEFAULT_SETTINGS), updatedAt: 0 };
 let session = { user: null };
 let dbRef = null, dbUploads = null, downloadsCap = null, remoteReady = false, saveTimer = null;
 
@@ -704,6 +710,7 @@ function loadLocal() {
   try { const s = JSON.parse(localStorage.getItem('kawa.state') || 'null'); if (s && s.v === 1) state = Object.assign(state, s, { settings: Object.assign({}, DEFAULT_SETTINGS, s.settings || {}) }); } catch (e) { }
   try { session = JSON.parse(localStorage.getItem('kawa.session') || '{"user":null}'); } catch (e) { }
 }
+function ensureState() { state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); }
 function saveLocal() { try { localStorage.setItem('kawa.state', JSON.stringify(state)); } catch (e) { } }
 function persist() {
   state.updatedAt = Date.now();
@@ -737,7 +744,7 @@ async function connectDb() {
       if (!snap.exists) { remoteReady = true; persist(); return; }
       const remote = snap.data();
       if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
-        const tx = state.tx; state = Object.assign(state, remote, { tx, settings: Object.assign({}, DEFAULT_SETTINGS, remote.settings || {}) }); saveLocal(); render();
+        const tx = state.tx; state = Object.assign(state, remote, { tx, settings: Object.assign({}, DEFAULT_SETTINGS, remote.settings || {}) }); ensureState(); saveLocal(); render();
       }
       remoteReady = true; setSync(true);
     }, () => setSync(false));
@@ -746,6 +753,8 @@ async function connectDb() {
       qs.docs.forEach(d => { for (const r of (d.data().rows || [])) { if (!state.tx[r.id]) { state.tx[r.id] = r; changed = true; } } });
       if (changed) { saveLocal(); render(); }
     }, () => { });
+    dbReceipts = db.collection('receipts');
+    dbReceipts.onSnapshot(qs => { let ch = false; qs.docs.forEach(d => { if (!receipts[d.id]) { receipts[d.id] = d.data().img; ch = true; } }); if (ch) { try { localStorage.setItem('kawa.receipts', JSON.stringify(receipts)); } catch (e) { } if (view.page === 'exp') render(); } }, () => { });
     downloadsCap = await window.claude.use('downloads');
   } catch (e) { setSync(false); }
 }
@@ -753,16 +762,20 @@ async function connectDb() {
 /* ---------------- derived data ---------------- */
 function allTx() {
   const rows = SEED.tx.concat(Object.values(state.tx));
-  for (const b of state.bills) rows.push({ id: b.id, a: b.account || 'manual', d: b.date, p: b.payee, v: -Math.abs(b.amount), k: b.recurring ? 'DD' : 'bill', r: b.note || '', manual: true, cat: b.category });
+  for (const b of state.bills) rows.push({ id: b.id, a: b.account || 'manual', d: b.date, p: b.payee, v: -Math.abs(b.amount), k: b.recurring ? 'DD' : 'bill', r: b.note || '', manual: true, cat: b.category, type: b.type || (b.recurring ? 'regular' : 'unexpected'), exp: !!b.exp, from: b.from, claimed: b.claimed, receipt: !!b.receipt });
   return rows.map(t => {
     const o = state.over[t.id] || {};
     const rule = ruleFor(t);
     const pk = payeeKey(t.p);
     const cat = o.c || (t.cat) || state.payeeCat[pk] || rule.cat;
-    const recurring = state.notRecurring[pk] ? false : (o.rec != null ? o.rec : (rule.flags.includes('r') || t.k === 'DD' || t.k === 'SO'));
     const g = catGroup(cat);
-    const oneoff = o.one != null ? o.one : (rule.flags.includes('o') || (!recurring && (g === 'variable' || g === 'fixed') && Math.abs(t.v) >= 150));
-    return Object.assign({}, t, { cat, pk, note: o.n || state.payeeNote[pk] || '', recurring, oneoff, group: catGroup(cat), m: monthOf(t.d) });
+    let type = o.t || (state.payeeType || {})[pk] || t.type;
+    if (!type) { if (state.notRecurring[pk]) type = 'everyday'; else if (rule.flags.includes('r') || t.k === 'DD' || t.k === 'SO') type = 'regular'; else if (rule.flags.includes('o') || ((g === 'variable' || g === 'fixed') && Math.abs(t.v) >= 150)) type = 'oneoff'; else type = 'everyday'; }
+    const recurring = type === 'regular'; const oneoff = type === 'oneoff' || type === 'unexpected';
+    const pe = (state.payeeExp || {})[pk] || {};
+    const exp = o.exp != null ? o.exp : (t.exp != null ? t.exp : (pe.exp != null ? pe.exp : rule.flags.includes('x')));
+    const claimFrom = o.from || t.from || pe.from || (rule.flags.includes('x') ? state.settings.claimFrom[0] : '');
+    return Object.assign({}, t, { cat, pk, note: o.n || state.payeeNote[pk] || '', type, recurring, oneoff, exp: !!exp && t.v < 0, claimFrom, claimed: o.claimed || t.claimed || null, group: catGroup(cat), m: monthOf(t.d) });
   }).sort((a, b) => b.d.localeCompare(a.d) || a.a.localeCompare(b.a));
 }
 function months() { const c = {}; for (const t of allTx()) c[t.m] = (c[t.m] || 0) + 1; return Object.keys(c).filter(m => c[m] >= 5).sort(); }
@@ -784,6 +797,7 @@ function summary(ym) {
   const variable = -sum(t => spend(t) && !t.recurring && !t.oneoff);
   const oneoffs = -sum(t => spend(t) && t.oneoff);
   const vat = state.settings.vat || 0;
+  const reclaim = -sum(t => t.exp && !t.claimed);
   const out = r2(fixed + bnpl + variable + oneoffs + vat);
   const spare = r2(income - out);
   const byCat = {};
@@ -792,15 +806,15 @@ function summary(ym) {
   for (const t of tx) if (t.group !== 'transfer' && t.v < 0) byAcc[t.a] = r2((byAcc[t.a] || 0) - t.v);
   const byPayee = {};
   for (const t of tx) if (t.group !== 'transfer' && t.group !== 'income' && t.v < 0) byPayee[t.pk] = r2((byPayee[t.pk] || 0) - t.v);
-  return { ym, tx, income, incomeOne, fixed, bnpl, variable, oneoffs, vat, out, spare, byCat, byAcc, byPayee, expected: (state.settings.incomeThinc || 0) + (state.settings.incomeOneHolidays || 0) };
+  return { ym, tx, income, incomeOne, fixed, bnpl, variable, oneoffs, vat, out, spare, reclaim, byCat, byAcc, byPayee, expected: (state.settings.incomeThinc || 0) + (state.settings.incomeOneHolidays || 0) };
 }
 /* fixed cost register: one row per recurring payee */
 function fixedRegister() {
   const tx = allTx().filter(t => t.recurring && t.v < 0 && t.group !== 'transfer');
   const byKey = {};
   for (const t of tx) { const k = t.a + '|' + t.pk; (byKey[k] = byKey[k] || { key: k, pk: t.pk, acc: t.a, payee: t.p, cat: t.cat, kind: t.k, months: {}, last: null, note: t.note }); const b = byKey[k]; b.months[t.m] = r2((b.months[t.m] || 0) - t.v); if (!b.last || t.d > b.last.d) b.last = t; }
-  const rows = Object.values(byKey).map(b => { const ms = Object.keys(b.months).sort(); const latest = ms[ms.length - 1]; return Object.assign(b, { day: dayOf(b.last.d), amount: b.months[latest], latestMonth: latest, kindLabel: b.kind === 'DD' ? 'Direct Debit' : b.kind === 'SO' ? 'Standing Order' : (b.kind === 'card' ? 'Card / subscription' : b.kind === 'payment' ? 'Bank transfer' : b.kind === 'fee' ? 'Fee' : 'Regular') }); });
-  rows.push({ key: 'virtual|vat', pk: 'VAT SET-ASIDE', acc: 'oneholidays', payee: 'VAT set-aside (Flat Rate)', cat: 'Tax & VAT', kind: 'virtual', months: {}, day: 7, amount: state.settings.vat || 0, kindLabel: 'Set aside monthly', note: state.payeeNote['VAT SET-ASIDE'] || 'Pay HMRC quarterly from One Holidays', virtual: true });
+  const rows = Object.values(byKey).map(b => { const ms = Object.keys(b.months).sort(); const latest = ms[ms.length - 1]; return Object.assign(b, { day: dayOf(b.last.d), amount: b.months[latest], latestMonth: latest, confirmed: ms.length >= 2 || b.kind === 'DD' || b.kind === 'SO', kindLabel: b.kind === 'DD' ? 'Direct Debit' : b.kind === 'SO' ? 'Standing Order' : (b.kind === 'card' ? 'Card / subscription' : b.kind === 'payment' ? 'Bank transfer' : b.kind === 'fee' ? 'Fee' : 'Regular') }); });
+  rows.push({ key: 'virtual|vat', pk: 'VAT SET-ASIDE', acc: 'oneholidays', payee: 'VAT set-aside (Flat Rate)', cat: 'Tax & VAT', kind: 'virtual', months: {}, day: 7, amount: state.settings.vat || 0, kindLabel: 'Set aside monthly', note: state.payeeNote['VAT SET-ASIDE'] || 'Pay HMRC quarterly from One Holidays', virtual: true, confirmed: true });
   return rows.sort((a, b) => a.day - b.day || b.amount - a.amount);
 }
 
@@ -838,7 +852,10 @@ const NAV = [
   ['home', 'Home', 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'],
   ['accounts', 'Accounts', 'M3 6h18v12H3zM3 10h18M7 14h4'],
   ['fixed', 'Fixed costs', 'M4 4h16v16H4zM8 2v4M16 2v4M4 9h16M8 13h2M12 13h2M16 13h2'],
+  ['set', 'DD & SO', 'M3 7h18M3 12h18M3 17h18M7 7v10'],
+  ['plan', 'Planner', 'M4 19V5m0 14h16M8 15l4-5 3 3 5-7'],
   ['tx', 'Transactions', 'M4 6h16M4 12h10M4 18h7'],
+  ['exp', 'Expenses', 'M9 3h6l1 2h4v16H4V5h4zM8 11h8M8 15h5'],
   ['upload', 'Upload', 'M12 16V4M6 10l6-6 6 6M4 20h16'],
   ['settings', 'Settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.5a7 7 0 0 0-1.7 1L5.1 5.6l-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5c.1-.3.1-.7.1-1z'],
 ];
@@ -853,14 +870,14 @@ function destroyCharts() { for (const k in charts) { try { charts[k].destroy(); 
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function chartDefaults() { if (typeof Chart === 'undefined') return; Chart.defaults.color = css('--muted'); Chart.defaults.borderColor = css('--line'); Chart.defaults.font.family = css('--body'); Chart.defaults.font.size = 11; }
 function monthSelect(id, value, list) { return `<select id="${id}">${list.map(m => `<option value="${m}" ${m === value ? 'selected' : ''}>${monthLabel(m)}</option>`).join('')}</select>`; }
-function catSelect(cls, value) { return `<select class="${cls}">${CATS.map(c => `<option ${c[0] === value ? 'selected' : ''}>${c[0]}</option>`).join('')}</select>`; }
+function catSelect(cls, value) { return `<select class="${cls}">${allCats().map(c => `<option ${c === value ? 'selected' : ''}>${c}</option>`).join('')}<option value="__new__">＋ New category…</option></select>`; }
 
 function render() {
   renderNav();
   const ms = months(); if (!view.month || !ms.includes(view.month)) view.month = ms.includes(state.settings.startMonth) ? state.settings.startMonth : ms[ms.length - 1];
   destroyCharts(); chartDefaults();
   const main = $('#main');
-  ({ home: renderHome, accounts: renderAccounts, fixed: renderFixed, tx: renderTx, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
+  ({ home: renderHome, accounts: renderAccounts, fixed: renderFixed, set: renderSet, plan: renderPlan, tx: renderTx, exp: renderExpenses, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
   $('#whoName').textContent = session.user || '';
 }
 
@@ -873,12 +890,12 @@ function renderHome(main) {
   <div class="section">
     <div class="toolbar"><h1>Household position</h1><div class="spacer"></div><label class="small muted">Month ${monthSelect('homeMonth', ym, ms)}</label></div>
     <div class="grid g4 tiles">
-      <div class="tile hero ${s.spare < 0 ? 'neg' : ''}"><div class="lbl">${s.spare < 0 ? 'Shortfall' : 'Spare income'}</div><div class="val num">${gbp(s.spare)}</div><div class="sub">Income − all outgoings − VAT set-aside</div><div class="stripe"><i style="width:${pct}%;background:var(--accent-fg)"></i></div></div>
+      <div class="tile hero ${s.spare < 0 ? 'neg' : ''}"><div class="lbl">${s.spare < 0 ? 'Shortfall' : 'Spare income'}</div><div class="val num">${gbp(s.spare)}</div><div class="sub">Income − all outgoings − VAT set-aside${s.reclaim ? ` · ${gbp(s.reclaim)} reclaimable` : ''}</div><div class="stripe"><i style="width:${pct}%;background:var(--accent-fg)"></i></div></div>
       <div class="tile"><div class="lbl">Income received</div><div class="val num">${gbp(s.income)}</div><div class="sub">Expected ${gbp(s.expected, { dp: 0 })}${s.incomeOne ? ` · one-off ${gbp(s.incomeOne)}` : ''}</div></div>
       <div class="tile"><div class="lbl">Fixed costs</div><div class="val num">${gbp(s.fixed + s.vat)}</div><div class="sub">DDs, SOs, rent, subscriptions + ${gbp(s.vat, { dp: 0 })} VAT</div></div>
       <div class="tile"><div class="lbl">Everyday spend</div><div class="val num">${gbp(s.variable)}</div><div class="sub">Groceries, fuel, eating out, kids, shopping</div></div>
       <div class="tile"><div class="lbl">Zilch / Clearpay</div><div class="val num">${gbp(s.bnpl)}</div><div class="sub">Instalments on past purchases</div></div>
-      <div class="tile"><div class="lbl">One-off payments</div><div class="val num">${gbp(s.oneoffs)}</div><div class="sub">Single payments over £150, not regular</div></div>
+      <div class="tile"><div class="lbl">One-off & unexpected</div><div class="val num">${gbp(s.oneoffs)}</div><div class="sub">Single payments, not regular</div></div>
       <div class="tile"><div class="lbl">Total outgoings</div><div class="val num">${gbp(s.out)}</div><div class="sub">${pct}% of income</div></div>
       <div class="tile"><div class="lbl">Statements loaded</div><div class="val num">${covered.filter(x => x.c).length}/${covered.length}</div><div class="sub">${covered.filter(x => !x.c).map(x => x.a.name).join(', ') || 'All accounts covered'}</div></div>
     </div>
@@ -894,7 +911,7 @@ function renderHome(main) {
         ${covered.map(({ a, c }) => { const rows = s.tx.filter(t => t.a === a.id); const inn = rows.filter(t => t.v > 0).reduce((x, t) => x + t.v, 0); const out = -rows.filter(t => t.v < 0).reduce((x, t) => x + t.v, 0); return `<tr><td><span class="payee">${a.name}</span><div class="ref">${a.bank}</div></td><td class="num muted">${a.last4 ? '•••• ' + a.last4 : '—'}</td><td class="num pos">${c ? gbp(inn) : '—'}</td><td class="num">${c ? gbp(out) : '—'}</td><td>${c ? `${ordinal(c.first)}–${ordinal(c.last)} · ${c.n} items` : '<span class="pill warn">awaiting statement</span>'}</td></tr>`; }).join('')}
       </tbody></table></div></div>
     </div>
-    <div class="card"><div class="cardhead"><h2>One-off payments in ${monthLabel(ym)}</h2><span class="small muted">tick “regular” on a row to move it to fixed costs</span></div>${txTable(s.tx.filter(t => t.oneoff), { showAcc: true })}</div>
+    <div class="card"><div class="cardhead"><h2>One-off payments in ${monthLabel(ym)}</h2><span class="small muted">set Type to “Regular” to move a payment into fixed costs</span></div>${txTable(s.tx.filter(t => t.oneoff), { showAcc: true })}</div>
   </div>`;
   $('#homeMonth').onchange = e => { view.month = e.target.value; render(); };
   // charts
@@ -917,18 +934,28 @@ function txTable(rows, o) {
   o = o || {};
   if (!rows.length) return '<div class="muted small">Nothing here.</div>';
   const total = r2(rows.reduce((a, t) => a + t.v, 0));
-  return `<div class="tw"><table class="txt"><thead><tr><th>Date</th>${o.showAcc ? '<th>Account</th>' : ''}<th>Payee</th><th>Category</th><th>Note</th><th>Regular</th><th class="num">Amount</th></tr></thead><tbody>
-  ${rows.map(t => `<tr data-id="${t.id}"><td class="num" title="${t.d}">${shortDate(t.d)}</td>${o.showAcc ? `<td class="small">${esc(accName(t.a))}</td>` : ''}<td><span class="payee">${esc(t.p)}</span>${t.r ? `<div class="ref">${esc(t.r)}</div>` : ''}${t.k === 'DD' || t.k === 'SO' ? ` <span class="pill n">${t.k}</span>` : ''}</td><td>${catSelect('cat', t.cat)}</td><td><input class="note" type="text" value="${esc(t.note)}" placeholder="e.g. St Mary's entrance test"></td><td><input class="rec" type="checkbox" ${t.recurring ? 'checked' : ''} title="Regular monthly cost"></td><td class="num ${t.v < 0 ? '' : 'pos'}">${gbp(t.v, { sign: true })}</td></tr>`).join('')}
-  <tr class="total"><td colspan="${o.showAcc ? 6 : 5}">Total (${rows.length})</td><td class="num">${gbp(total, { sign: true })}</td></tr></tbody></table></div>`;
+  return `<div class="tw"><table class="txt"><thead><tr><th>Date</th>${o.showAcc ? '<th>Account</th>' : ''}<th>Payee</th><th>Category</th><th>Type</th><th>Work exp.</th><th>Note</th><th class="num">Amount</th></tr></thead><tbody>
+  ${rows.map(t => `<tr data-id="${t.id}"><td class="num" title="${t.d}">${shortDate(t.d)}</td>${o.showAcc ? `<td class="small">${esc(accName(t.a))}</td>` : ''}<td><span class="payee">${esc(t.p)}</span>${t.r ? `<div class="ref">${esc(t.r)}</div>` : ''}${t.k === 'DD' || t.k === 'SO' ? ` <span class="pill n">${t.k}</span>` : ''}</td><td>${catSelect('cat', t.cat)}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === t.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${t.exp ? 'checked' : ''} title="Reclaimable work expense"> <select class="from" ${t.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === t.claimFrom ? 'selected' : ''}>${c}</option>`).join('')}</select>${t.claimed ? ' <span class="pill good">claimed</span>' : ''}</td><td><input class="note" type="text" value="${esc(t.note)}" placeholder="e.g. St Mary's entrance test"></td><td class="num ${t.v < 0 ? '' : 'pos'}">${gbp(t.v, { sign: true })}</td></tr>`).join('')}
+  <tr class="total"><td colspan="${o.showAcc ? 7 : 6}">Total (${rows.length})</td><td class="num">${gbp(total, { sign: true })}</td></tr></tbody></table></div>`;
 }
 function bindTxTables(root) {
   $$('table.txt tr[data-id]', root).forEach(tr => {
     const id = tr.dataset.id;
-    $('select.cat', tr).onchange = e => setCategory(id, e.target.value, tr);
+    $('select.cat', tr).onchange = e => { if (e.target.value === '__new__') { newCategoryInline(e.target, cat => setCategory(id, cat, tr)); return; } setCategory(id, e.target.value, tr); };
     const note = $('input.note', tr); note.onchange = () => { setNote(id, note.value); };
-    $('input.rec', tr).onchange = e => { const t = findTx(id); state.over[id] = Object.assign({}, state.over[id], { rec: e.target.checked, one: e.target.checked ? false : undefined }); if (!e.target.checked && t) state.notRecurring[t.pk] = true; else if (t) delete state.notRecurring[t.pk]; persist(); toast(e.target.checked ? 'Marked as a regular cost' : 'Marked as not regular'); };
+    $('select.typ', tr).onchange = e => { const t = findTx(id); state.over[id] = Object.assign({}, state.over[id], { t: e.target.value }); if (t && e.target.value !== 'regular') state.notRecurring[t.pk] = true; else if (t) delete state.notRecurring[t.pk]; if (t) { state.payeeType = state.payeeType || {}; state.payeeType[t.pk] = e.target.value; } persist(); toast('Type: ' + e.target.selectedOptions[0].text); };
+    $('input.exp', tr).onchange = e => { const t = findTx(id); const sel = $('select.from', tr); sel.hidden = !e.target.checked; state.over[id] = Object.assign({}, state.over[id], { exp: e.target.checked, from: sel.value }); if (t) { state.payeeExp = state.payeeExp || {}; state.payeeExp[t.pk] = { exp: e.target.checked, from: sel.value }; } persist(); toast(e.target.checked ? 'Marked as a work expense' : 'Not a work expense'); };
+    $('select.from', tr).onchange = e => { const t = findTx(id); state.over[id] = Object.assign({}, state.over[id], { from: e.target.value }); if (t) { state.payeeExp = state.payeeExp || {}; state.payeeExp[t.pk] = { exp: true, from: e.target.value }; } persist(); };
   });
 }
+function newCategoryInline(sel, done) {
+  const box = document.createElement('div'); box.className = 'small'; box.style.marginTop = '4px';
+  box.innerHTML = `<input type="text" placeholder="Category name" style="width:150px"> <select><option value="variable">Everyday</option><option value="fixed">Fixed cost</option><option value="transfer">Transfer (ignored)</option><option value="income">Income</option></select> <button class="btn sm">Add</button>`;
+  sel.parentElement.appendChild(box);
+  const inp = box.querySelector('input'); inp.focus();
+  box.querySelector('button').onclick = () => { const name = inp.value.trim(); if (!name) return; addCategory(name, box.querySelector('select').value); box.remove(); done(name); };
+}
+function addCategory(name, group) { state.customCats = state.customCats || []; if (!allCats().includes(name)) state.customCats.push({ name, group: group || 'variable' }); persist(); }
 function findTx(id) { return allTx().find(t => t.id === id); }
 function setCategory(id, cat, tr) {
   const t = findTx(id); if (!t) return;
@@ -1007,14 +1034,14 @@ function renderFixed(main) {
         <select id="bAcc">${ACCOUNTS.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select>
         ${catSelect('', 'Cash & Other').replace('<select', '<select id="bCat"')}
         <input type="text" id="bNote" placeholder="Note (e.g. St Mary's School entrance test)">
-        <label class="small"><input type="checkbox" id="bRec"> monthly</label>
+        <select id="bType">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === 'unexpected' ? 'selected' : ''}>${x[1]}</option>`).join('')}</select>
         <button class="btn" type="submit">Add</button>
       </form>
-      ${state.bills.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Date</th><th>Payee</th><th>Account</th><th>Category</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead><tbody>${state.bills.map(b => `<tr><td class="num">${shortDate(b.date)}</td><td class="payee">${esc(b.payee)}</td><td class="small">${esc(accName(b.account))}</td><td>${esc(b.category)}</td><td>${esc(b.note || '')}${b.recurring ? ' <span class="pill n">monthly</span>' : ''}</td><td class="num">${gbp(-b.amount)}</td><td><button class="btn sm danger" data-del="${b.id}">Remove</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${state.bills.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Date</th><th>Payee</th><th>Account</th><th>Category</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead><tbody>${state.bills.map(b => `<tr><td class="num">${shortDate(b.date)}</td><td class="payee">${esc(b.payee)}</td><td class="small">${esc(accName(b.account))}</td><td>${esc(b.category)}</td><td>${esc(b.note || '')} <span class="pill n">${(TYPES.find(x => x[0] === (b.type || (b.recurring ? 'regular' : 'unexpected'))) || TYPES[3])[1]}</span>${b.exp ? ' <span class="pill warn">work expense</span>' : ''}</td><td class="num">${gbp(-b.amount)}</td><td><button class="btn sm danger" data-del="${b.id}">Remove</button></td></tr>`).join('')}</tbody></table></div>` : ''}
     </div>
   </div>`;
   $$('#fixedTable input.note').forEach(inp => inp.onchange = () => { const key = inp.closest('tr').dataset.key; state.payeeNote[key] = inp.value; persist(); toast('Note saved'); });
-  $('#billForm').onsubmit = e => { e.preventDefault(); state.bills.push({ id: 'b' + Date.now().toString(36), date: $('#bDate').value, payee: $('#bPayee').value.trim(), amount: +$('#bAmount').value, account: $('#bAcc').value, category: $('#bCat').value, note: $('#bNote').value.trim(), recurring: $('#bRec').checked }); persist(); render(); toast('Bill added'); };
+  $('#billForm').onsubmit = e => { e.preventDefault(); state.bills.push({ id: 'b' + Date.now().toString(36), date: $('#bDate').value, payee: $('#bPayee').value.trim(), amount: +$('#bAmount').value, account: $('#bAcc').value, category: $('#bCat').value === '__new__' ? 'Cash & Other' : $('#bCat').value, note: $('#bNote').value.trim(), type: $('#bType').value, recurring: $('#bType').value === 'regular' }); persist(); render(); toast('Bill added'); };
   $$('[data-del]').forEach(b => b.onclick = () => { state.bills = state.bills.filter(x => x.id !== b.dataset.del); persist(); render(); });
 }
 
@@ -1032,7 +1059,7 @@ function renderTx(main) {
     <div class="toolbar">
       <select id="fMonth"><option value="all">All months</option>${ms.map(m => `<option value="${m}" ${f.month === m ? 'selected' : ''}>${monthLabel(m)}</option>`).join('')}</select>
       <select id="fAcc"><option value="all">All accounts</option>${ACCOUNTS.map(a => `<option value="${a.id}" ${f.acc === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}</select>
-      <select id="fCat"><option value="all">All categories</option><option value="uncat" ${f.cat === 'uncat' ? 'selected' : ''}>To categorise (${uncat})</option>${CATS.map(c => `<option ${f.cat === c[0] ? 'selected' : ''}>${c[0]}</option>`).join('')}</select>
+      <select id="fCat"><option value="all">All categories</option><option value="uncat" ${f.cat === 'uncat' ? 'selected' : ''}>To categorise (${uncat})</option>${allCats().map(c => `<option ${f.cat === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <input type="search" id="fQ" placeholder="Search payee or note" value="${esc(f.q)}">
     </div>
     <div class="help">Change a category and the platform offers to remember it for that payee, so next month's statement is categorised automatically. Notes are saved per transaction.</div>
@@ -1116,6 +1143,191 @@ function parseCsvText(text, account) {
 function parseAnyDate(s) { s = String(s || '').trim(); let m; if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`; if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/))) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; } if ((m = s.match(/^(\d{1,2}) ([A-Za-z]{3})[a-z]* (\d{4})/))) { const mm = KawaParsers.MONTHS[m[2].toLowerCase()]; if (mm) return `${m[3]}-${String(mm).padStart(2, '0')}-${m[1].padStart(2, '0')}`; } return null; }
 function hash12(str) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 'u' + (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(3, '0').slice(0, 3); }
 
+/* ---------------- set payments & planner ---------------- */
+function destAccount(t) { const b = (t.r || '').toUpperCase(); const p = (t.p || '').toUpperCase(); if (/VIRGIN/.test(b) || /LH SERVICES/.test(p)) return 'louise_virgin'; if (/REVOLUT/.test(b) || /ONE HOLIDAYS/.test(p)) return 'oneholidays'; if (/THINC BUSINESS/.test(p)) return 'thinc'; if (/LOUISE HADI/.test(p)) return 'louise_hsbc'; if (/AJAY KAWA/.test(p)) return 'ajay_hsbc'; return null; }
+function baseMonth() { const ms = months(); const pref = state.plan.base; if (pref && ms.includes(pref)) return pref; const full = ms.filter(m => m <= '2026-09' || summary(m).income >= state.settings.incomeThinc); return full.length ? full[full.length - 1] : ms[ms.length - 1]; }
+function nextMonth(ym) { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m, 1)); return d.toISOString().slice(0, 7); }
+function addMonths(ym, n) { let r = ym; for (let i = 0; i < n; i++) r = nextMonth(r); return r; }
+/* all set payments: fixed register + transfers to ourselves + card payments */
+function setPayments() {
+  const bm = baseMonth();
+  const rows = fixedRegister().map(r => Object.assign({}, r, { type: r.kind === 'DD' ? 'DD' : r.kind === 'SO' ? 'SO' : r.virtual ? 'Set-aside' : 'Subscription', from: r.acc, to: null }));
+  const tr = allTx().filter(t => (t.cat === 'Pay to ourselves' || t.cat === 'Transfer (internal)') && t.v < 0 && t.m === bm && destAccount(t) && destAccount(t) !== t.a);
+  const g = {};
+  for (const t of tr) { const to = destAccount(t); const k = `transfer|${t.a}|${to}`; (g[k] = g[k] || { key: k, pk: t.pk, acc: t.a, from: t.a, to, payee: `${accName(t.a)} → ${accName(to)}`, cat: t.cat, kind: 'payment', type: 'Transfer', months: {}, day: dayOf(t.d), amount: 0, kindLabel: t.cat, note: state.payeeNote[k] || '', confirmed: true }); g[k].amount = r2(g[k].amount - t.v); g[k].months[bm] = g[k].amount; if (dayOf(t.d) < g[k].day) g[k].day = dayOf(t.d); }
+  rows.push(...Object.values(g));
+  for (const a of ACCOUNTS.filter(x => x.type === 'credit')) { const cov = SEED.coverage.filter(c => c.account === a.id); const latest = cov[cov.length - 1]; const min = latest && latest.summary.minPayment ? latest.summary.minPayment : 0; if (min) rows.push({ key: 'card|' + a.id, pk: 'CARD ' + a.id, acc: 'thinc', from: 'thinc', to: a.id, payee: a.name + ' minimum payment', cat: 'Credit Card Payment', kind: 'payment', type: 'Card payment', months: {}, day: a.id === 'capitalone' ? 21 : 15, amount: min, kindLabel: 'Card payment', confirmed: true, note: state.payeeNote['CARD ' + a.id] || (latest.summary.dueDate ? 'Due ' + latest.summary.dueDate : '') }); }
+  for (const r of rows) { r.planAcc = (state.plan.moves || {})[r.key] || r.from; r.planAmt = (state.plan.amt || {})[r.key] != null ? state.plan.amt[r.key] : r.amount; const sk = (state.plan.skip || {})[r.key]; r.skip = sk != null ? !!sk : !r.confirmed; }
+  return rows.filter(r => !(state.plan.hidden || {})[r.key]).sort((a, b) => a.day - b.day || b.amount - a.amount);
+}
+function renderSet(main) {
+  const rows = setPayments(); const f = view.setFilter = view.setFilter || { acc: 'all', type: 'all' };
+  const shown = rows.filter(r => (f.acc === 'all' || r.planAcc === f.acc || r.from === f.acc) && (f.type === 'all' || r.type === f.type));
+  const types = ['DD', 'SO', 'Subscription', 'Transfer', 'Card payment', 'Set-aside'];
+  const perAcc = ACCOUNTS.filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => { const cur = r2(rows.filter(r => r.from === a.id && !r.skip).reduce((x, r) => x + r.planAmt, 0)); const plan = r2(rows.filter(r => r.planAcc === a.id && !r.skip).reduce((x, r) => x + r.planAmt, 0)); return { a, cur, plan }; }).filter(x => x.cur || x.plan);
+  main.innerHTML = `<div class="section">
+    <div class="toolbar"><h1>Direct debits & set payments</h1><div class="spacer"></div><span class="pill n num">${gbp(r2(rows.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))} / month</span></div>
+    <div class="help">Every direct debit, standing order, subscription, card payment and transfer to ourselves, across all banks, based on ${monthLabel(baseMonth())}. Use <b>Paid from</b> to plan moving a payment to a different account; the planner and the per-account totals update straight away. Tick <b>Skip</b> for anything that will not go out next month; payments seen only once are skipped by default until you untick them. <b>Remove</b> takes a payment off this list for good (it becomes a one-off in Transactions). Removed items: ${Object.keys(state.plan.hidden || {}).length} <button class="btn sm ghost" id="unhide">restore all</button> Louise's HSBC payments will be added when her statement is uploaded.</div>
+    <div class="chips" id="setAcc"><button class="chip ${f.acc === 'all' ? 'on' : ''}" data-acc="all">All accounts</button>${ACCOUNTS.filter(a => a.type !== 'manual').map(a => `<button class="chip ${f.acc === a.id ? 'on' : ''}" data-acc="${a.id}">${a.name}</button>`).join('')}</div>
+    <div class="chips" id="setType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">All types</button>${types.map(t => `<button class="chip ${f.type === t ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
+    <div class="grid g4 tiles">${perAcc.map(x => `<div class="tile"><div class="lbl">${esc(x.a.name)}</div><div class="val num">${gbp(x.plan)}</div><div class="sub">${x.plan !== x.cur ? `now ${gbp(x.cur)} → planned ${gbp(x.plan)}` : 'per month, no changes planned'}</div></div>`).join('')}</div>
+    <div class="card"><div class="tw"><table id="setTable"><thead><tr><th>Day</th><th>Payee</th><th>Type</th><th>Category</th><th class="num">Amount</th><th>Paid from (planned)</th><th>Skip</th><th>Note</th><th></th></tr></thead><tbody>
+      ${shown.map(r => `<tr data-key="${esc(r.key)}" data-pk="${esc(r.pk)}" style="${r.skip ? 'opacity:.5' : ''}"><td class="num">${ordinal(r.day)}</td><td><span class="payee">${esc(r.payee)}</span>${r.to && r.type === 'Transfer' ? '' : `<div class="ref">${esc(accName(r.from))}${r.planAcc !== r.from ? ' → moving to ' + esc(accName(r.planAcc)) : ''}</div>`}</td><td class="small muted">${r.type}${r.confirmed ? '' : '<div class="ref">seen once – skipped unless you untick</div>'}</td><td><i class="dot" style="background:${catColor(r.cat)}"></i>${esc(r.cat)}</td><td class="num"><input class="amt" type="number" step="0.01" value="${r.planAmt}" style="width:95px;text-align:right"></td><td><select class="from">${ACCOUNTS.filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}" ${a.id === r.planAcc ? 'selected' : ''}>${a.name}</option>`).join('')}</select></td><td><input class="skip" type="checkbox" ${r.skip ? 'checked' : ''}></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td><td><button class="btn sm danger rm" title="Remove from set payments (it stays in Transactions as a one-off)">Remove</button></td></tr>`).join('')}
+      <tr class="total"><td colspan="4">Total shown</td><td class="num">${gbp(r2(shown.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))}</td><td colspan="4"></td></tr>
+    </tbody></table></div></div>
+  </div>`;
+  $('#unhide').onclick = () => { state.plan.hidden = {}; persist(); render(); };
+  $$('#setAcc .chip').forEach(b => b.onclick = () => { f.acc = b.dataset.acc; render(); });
+  $$('#setType .chip').forEach(b => b.onclick = () => { f.type = b.dataset.type; render(); });
+  $$('#setTable tr[data-key]').forEach(tr => {
+    const key = tr.dataset.key, pk = tr.dataset.pk;
+    $('select.from', tr).onchange = e => { state.plan.moves = state.plan.moves || {}; state.plan.moves[key] = e.target.value; persist(); render(); toast('Planned move saved'); };
+    $('input.amt', tr).onchange = e => { state.plan.amt = state.plan.amt || {}; state.plan.amt[key] = +e.target.value || 0; persist(); render(); };
+    $('input.skip', tr).onchange = e => { state.plan.skip = state.plan.skip || {}; state.plan.skip[key] = e.target.checked; persist(); render(); };
+    $('input.note', tr).onchange = e => { state.payeeNote[pk] = e.target.value; persist(); toast('Note saved'); };
+    $('button.rm', tr).onclick = () => { state.plan.hidden = state.plan.hidden || {}; state.plan.hidden[key] = true; if (!/^(transfer|card|virtual)\|/.test(key)) { state.notRecurring[pk] = true; state.payeeType = state.payeeType || {}; state.payeeType[pk] = 'oneoff'; } persist(); render(); toast('Removed from set payments'); };
+  });
+}
+/* forecast for a future month */
+function planFor(ym) { state.plan.months = state.plan.months || {}; return state.plan.months[ym] = state.plan.months[ym] || { income: {}, allow: {}, bnpl: {}, opening: {}, extras: [] }; }
+function forecast(ym) {
+  const pl = planFor(ym); const bm = baseMonth(); const base = summary(bm); const rows = setPayments().filter(r => !r.skip);
+  const accs = ACCOUNTS.filter(a => a.type !== 'manual' && a.type !== 'credit');
+  const baseVar = {}, baseBnpl = {};
+  for (const t of base.tx) { if (t.v < 0 && t.group !== 'transfer') { if (t.group === 'bnpl') baseBnpl[t.a] = r2((baseBnpl[t.a] || 0) - t.v); else if (!t.recurring && !t.oneoff && t.group !== 'income') baseVar[t.a] = r2((baseVar[t.a] || 0) - t.v); } }
+  const out = accs.map(a => {
+    const defIncome = a.id === 'thinc' ? state.settings.incomeThinc : a.id === 'oneholidays' ? state.settings.incomeOneHolidays : 0;
+    const income = pl.income[a.id] != null ? pl.income[a.id] : defIncome;
+    const cov = SEED.coverage.filter(c => c.account === a.id); const latest = cov[cov.length - 1];
+    const opening = pl.opening[a.id] != null ? pl.opening[a.id] : (latest && latest.summary.closing != null ? latest.summary.closing : 0);
+    const fixedRows = rows.filter(r => r.planAcc === a.id && r.type !== 'Transfer');
+    const fixed = r2(fixedRows.reduce((x, r) => x + r.planAmt, 0));
+    const tOut = r2(rows.filter(r => r.type === 'Transfer' && r.planAcc === a.id).reduce((x, r) => x + r.planAmt, 0));
+    const tIn = r2(rows.filter(r => r.type === 'Transfer' && r.to === a.id).reduce((x, r) => x + r.planAmt, 0));
+    const allow = pl.allow[a.id] != null ? pl.allow[a.id] : (baseVar[a.id] || 0);
+    const bnpl = pl.bnpl[a.id] != null ? pl.bnpl[a.id] : (baseBnpl[a.id] || 0);
+    const extras = r2(pl.extras.filter(e => e.acc === a.id).reduce((x, e) => x + e.amount, 0));
+    const end = r2(opening + income + tIn - tOut - fixed - allow - bnpl - extras);
+    return { a, income, opening, fixed, fixedRows, tOut, tIn, allow, bnpl, extras, end, defIncome, defAllow: baseVar[a.id] || 0, defBnpl: baseBnpl[a.id] || 0 };
+  });
+  const tot = k => r2(out.reduce((x, o) => x + o[k], 0));
+  return { ym, bm, accounts: out, income: tot('income'), fixed: tot('fixed'), allow: tot('allow'), bnpl: tot('bnpl'), extras: tot('extras'), spare: r2(tot('income') - tot('fixed') - tot('allow') - tot('bnpl') - tot('extras')), base };
+}
+function renderPlan(main) {
+  const ms = months(); const bm = baseMonth();
+  const cur = todayISO().slice(0, 7); const future = [1, 2, 3].map(n => addMonths(cur, n));
+  if (!view.planMonth || !future.includes(view.planMonth)) view.planMonth = future[0];
+  const ym = view.planMonth; const fc = forecast(ym); const pl = planFor(ym);
+  main.innerHTML = `<div class="section">
+    <div class="toolbar"><h1>Planner</h1><div class="spacer"></div><label class="small muted">Forecast for ${monthSelect('planMonth', ym, future)}</label><label class="small muted">based on ${monthSelect('planBase', bm, ms)}</label></div>
+    <div class="help">Income and set payments per account for ${monthLabel(ym)}. Everyday and Zilch/Clearpay allowances start at what was spent in ${monthLabel(bm)}; change any figure to see the effect. Moves planned on the DD &amp; SO page are already applied.</div>
+    <div class="grid g4 tiles">
+      <div class="tile hero ${fc.spare < 0 ? 'neg' : ''}"><div class="lbl">${fc.spare < 0 ? 'Forecast shortfall' : 'Forecast spare'}</div><div class="val num">${gbp(fc.spare)}</div><div class="sub">${monthLabel(ym)} · whole household</div></div>
+      <div class="tile"><div class="lbl">Income expected</div><div class="val num">${gbp(fc.income)}</div><div class="sub">all accounts</div></div>
+      <div class="tile"><div class="lbl">Set payments</div><div class="val num">${gbp(fc.fixed)}</div><div class="sub">DDs, SOs, subscriptions, rent, VAT, card minimums</div></div>
+      <div class="tile"><div class="lbl">Allowances</div><div class="val num">${gbp(r2(fc.allow + fc.bnpl))}</div><div class="sub">everyday ${gbp(fc.allow, { dp: 0 })} + Zilch/Clearpay ${gbp(fc.bnpl, { dp: 0 })}</div></div>
+    </div>
+    <div class="card"><div class="cardhead"><h2>Forecast by account</h2><span class="small muted">edit the shaded figures</span></div><div class="tw"><table id="planTable"><thead><tr><th>Account</th><th class="num">Opening</th><th class="num">Income</th><th class="num">Transfers in</th><th class="num">Transfers out</th><th class="num">Set payments</th><th class="num">Everyday</th><th class="num">Zilch/Clearpay</th><th class="num">Planned extras</th><th class="num">End of month</th></tr></thead><tbody>
+      ${fc.accounts.map(o => `<tr data-acc="${o.a.id}"><td><span class="payee">${esc(o.a.name)}</span>${o.a.pending ? '<div class="ref">awaiting statement</div>' : ''}</td><td class="num"><input class="f opening" type="number" step="0.01" value="${o.opening}"></td><td class="num"><input class="f income" type="number" step="0.01" value="${o.income}"></td><td class="num pos">${o.tIn ? gbp(o.tIn) : '—'}</td><td class="num">${o.tOut ? gbp(o.tOut) : '—'}</td><td class="num">${gbp(o.fixed)}</td><td class="num"><input class="f allow" type="number" step="0.01" value="${o.allow}"></td><td class="num"><input class="f bnpl" type="number" step="0.01" value="${o.bnpl}"></td><td class="num">${o.extras ? gbp(o.extras) : '—'}</td><td class="num ${o.end < 0 ? 'neg' : 'pos'}"><b>${gbp(o.end)}</b></td></tr>`).join('')}
+      <tr class="total"><td>Household</td><td></td><td class="num">${gbp(fc.income)}</td><td></td><td></td><td class="num">${gbp(fc.fixed)}</td><td class="num">${gbp(fc.allow)}</td><td class="num">${gbp(fc.bnpl)}</td><td class="num">${gbp(fc.extras)}</td><td class="num ${fc.spare < 0 ? 'neg' : 'pos'}">${gbp(fc.spare)}</td></tr>
+    </tbody></table></div><div class="help">Opening balance is the latest statement balance; transfers between our accounts cancel out at household level. Credit cards are not cash accounts, so they appear through their minimum payments only.</div></div>
+    <div class="grid g2">
+      <div class="card"><div class="cardhead"><h3>Set payments next month, by account</h3></div>${fc.accounts.filter(o => o.fixedRows.length).map(o => `<details open><summary>${esc(o.a.name)} <span class="num muted small">${gbp(o.fixed)}</span></summary><div class="tw"><table><tbody>${o.fixedRows.map(r => `<tr><td class="num muted">${ordinal(r.day)}</td><td>${esc(r.payee)}</td><td class="small muted">${r.type}</td><td class="num">${gbp(r.planAmt)}</td></tr>`).join('')}</tbody></table></div></details>`).join('')}</div>
+      <div class="card"><div class="cardhead"><h3>Planned extras for ${monthLabel(ym)}</h3></div><div class="help">Known one-offs coming up: school fees, car service, holiday deposits, birthdays.</div>
+        <form id="extraForm" class="toolbar" style="margin-top:8px"><input type="text" id="xPayee" placeholder="What" required><input type="number" id="xAmount" step="0.01" min="0" placeholder="£" required style="width:100px"><select id="xAcc">${fc.accounts.map(o => `<option value="${o.a.id}">${o.a.name}</option>`).join('')}</select><input type="number" id="xDay" min="1" max="31" placeholder="Day" style="width:70px"><button class="btn sm" type="submit">Add</button></form>
+        ${pl.extras.length ? `<div class="tw" style="margin-top:8px"><table><tbody>${pl.extras.map((e, i) => `<tr><td class="num muted">${e.day ? ordinal(e.day) : ''}</td><td class="payee">${esc(e.payee)}</td><td class="small">${esc(accName(e.acc))}</td><td class="num">${gbp(e.amount)}</td><td><button class="btn sm danger" data-x="${i}">Remove</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+      </div>
+    </div>
+    <div class="card"><div class="cardhead"><h2>Month by month</h2><span class="small muted">actual to date, then forecast</span></div><div class="chartbox"><canvas id="chPlan"></canvas></div></div>
+  </div>`;
+  $('#planMonth').onchange = e => { view.planMonth = e.target.value; render(); };
+  $('#planBase').onchange = e => { state.plan.base = e.target.value; persist(); render(); };
+  $$('#planTable tr[data-acc]').forEach(tr => { const acc = tr.dataset.acc; $$('input.f', tr).forEach(inp => inp.onchange = () => { const k = inp.classList.contains('opening') ? 'opening' : inp.classList.contains('income') ? 'income' : inp.classList.contains('allow') ? 'allow' : 'bnpl'; pl[k][acc] = +inp.value || 0; persist(); render(); }); });
+  $('#extraForm').onsubmit = e => { e.preventDefault(); pl.extras.push({ payee: $('#xPayee').value.trim(), amount: +$('#xAmount').value || 0, acc: $('#xAcc').value, day: +$('#xDay').value || null }); persist(); render(); };
+  $$('[data-x]').forEach(b => b.onclick = () => { pl.extras.splice(+b.dataset.x, 1); persist(); render(); });
+  if (typeof Chart === 'undefined') return;
+  const labels = ms.concat(future); const act = ms.map(m => summary(m)); const fcs = future.map(m => forecast(m));
+  charts.plan = new Chart($('#chPlan'), { type: 'bar', data: { labels: labels.map(m => monthLabel(m).slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: act.map(a => a.income).concat(fcs.map(f => f.income)), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c1') : css('--c1') + '80'), borderRadius: 4 }, { label: 'Outgoings', data: act.map(a => a.out).concat(fcs.map(f => r2(f.fixed + f.allow + f.bnpl + f.extras))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c2') : css('--c2') + '80'), borderRadius: 4 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '£' + (v / 1000) + 'k' }, grid: { color: css('--line') } }, x: { grid: { display: false } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${gbp(c.parsed.y)}` } } } } });
+}
+
+/* ---------------- expenses & claims ---------------- */
+let receipts = {};
+function loadReceipts() { try { receipts = JSON.parse(localStorage.getItem('kawa.receipts') || '{}'); } catch (e) { receipts = {}; } }
+function saveReceipt(id, dataUrl) { receipts[id] = dataUrl; try { localStorage.setItem('kawa.receipts', JSON.stringify(receipts)); } catch (e) { toast('Receipt too large to keep on this device'); } if (dbReceipts) dbReceipts.doc(id).set({ img: dataUrl, at: Date.now() }).catch(() => { }); }
+let dbReceipts = null;
+function shrinkImage(file) { return new Promise(res => { const img = new Image(); const url = URL.createObjectURL(file); img.onload = () => { const max = 900; const sc = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.72)); }; img.onerror = () => res(null); img.src = url; }); }
+function renderExpenses(main) {
+  const f = view.expFilter = view.expFilter || { from: 'all', status: 'open', sel: {} };
+  let rows = allTx().filter(t => t.exp);
+  if (f.from !== 'all') rows = rows.filter(t => t.claimFrom === f.from);
+  if (f.status === 'open') rows = rows.filter(t => !t.claimed); else if (f.status === 'claimed') rows = rows.filter(t => t.claimed);
+  const selRows = rows.filter(t => f.sel[t.id]);
+  const total = r2(-rows.reduce((a, t) => a + t.v, 0)); const selTotal = r2(-selRows.reduce((a, t) => a + t.v, 0));
+  const byFrom = {}; for (const t of allTx().filter(t => t.exp && !t.claimed)) byFrom[t.claimFrom] = r2((byFrom[t.claimFrom] || 0) - t.v);
+  main.innerHTML = `<div class="section">
+    <div class="toolbar"><h1>Expenses to claim</h1><div class="spacer"></div><span class="pill n num">${gbp(r2(Object.values(byFrom).reduce((a, v) => a + v, 0)))} unclaimed</span></div>
+    <div class="help">Anything ticked as a work expense in Transactions lands here. Choose who it is claimed from, select the lines and create a claim sheet; the sheet downloads as Excel with the receipt column pre-set to Yes, and the lines are marked as claimed. Anthropic charges are set to Brandon Hall Hotel &amp; Spa by default.</div>
+    <div class="grid g4 tiles">${Object.entries(byFrom).map(([k, v]) => `<div class="tile"><div class="lbl">${esc(k)}</div><div class="val num">${gbp(v)}</div><div class="sub">unclaimed</div></div>`).join('') || '<div class="tile"><div class="lbl">Unclaimed</div><div class="val num">£0.00</div></div>'}</div>
+    <div class="card"><div class="cardhead"><h3>Add an expense or receipt</h3><span class="small muted">works from the phone camera</span></div>
+      <form id="expForm" class="toolbar">
+        <input type="date" id="eDate" value="${todayISO()}" required>
+        <input type="text" id="ePayee" placeholder="Payee / what" required>
+        <input type="number" id="eAmount" step="0.01" min="0" placeholder="Amount £" required style="width:110px">
+        ${catSelect('', 'Work Expense').replace('<select', '<select id="eCat"')}
+        <select id="eFrom">${state.settings.claimFrom.map(c => `<option>${c}</option>`).join('')}</select>
+        <select id="eAcc">${ACCOUNTS.map(a => `<option value="${a.id}" ${a.id === 'manual' ? 'selected' : ''}>${a.name}</option>`).join('')}</select>
+        <input type="text" id="eNote" placeholder="Note">
+        <label class="btn ghost sm" style="cursor:pointer">📷 Receipt<input type="file" id="eReceipt" accept="image/*" capture="environment" class="hide"></label><span id="eReceiptName" class="small muted"></span>
+        <button class="btn" type="submit">Add expense</button>
+      </form>
+    </div>
+    <div class="toolbar">
+      <div class="chips" id="expFrom"><button class="chip ${f.from === 'all' ? 'on' : ''}" data-from="all">All</button>${state.settings.claimFrom.map(c => `<button class="chip ${f.from === c ? 'on' : ''}" data-from="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+      <div class="chips" id="expStatus"><button class="chip ${f.status === 'open' ? 'on' : ''}" data-status="open">To claim</button><button class="chip ${f.status === 'claimed' ? 'on' : ''}" data-status="claimed">Claimed</button><button class="chip ${f.status === 'all' ? 'on' : ''}" data-status="all">All</button></div>
+    </div>
+    <div class="card"><div class="cardhead"><h3>${rows.length} expense lines · ${gbp(total)}</h3><div class="toolbar"><button class="btn sm ghost" id="selAll">Select all</button><button class="btn sm ghost" id="selNone">Clear</button><button class="btn sm" id="makeClaim" ${selRows.length ? '' : 'disabled'}>Create claim sheet (${selRows.length} · ${gbp(selTotal)})</button></div></div>
+      <div class="tw"><table id="expTable"><thead><tr><th></th><th>Date</th><th>Payee</th><th>Account</th><th>Category</th><th>Claim from</th><th>Receipt</th><th>Note</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>
+        ${rows.map(t => `<tr data-id="${t.id}"><td><input class="pick" type="checkbox" ${f.sel[t.id] ? 'checked' : ''} ${t.claimed ? 'disabled' : ''}></td><td class="num">${shortDate(t.d)}</td><td><span class="payee">${esc(t.p)}</span>${t.r ? `<div class="ref">${esc(t.r)}</div>` : ''}</td><td class="small">${esc(accName(t.a))}</td><td class="small">${esc(t.cat)}</td><td><select class="from">${state.settings.claimFrom.map(c => `<option ${c === t.claimFrom ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td>${receipts[t.id] ? `<a href="#" class="rcpt" data-id="${t.id}"><img src="${receipts[t.id]}" alt="receipt" style="height:36px;border-radius:4px"></a>` : (t.receipt ? '<span class="pill n">on other device</span>' : '<span class="pill good">Yes</span>')}</td><td><input class="note" type="text" value="${esc(t.note)}"></td><td class="num">${gbp(-t.v)}</td><td>${t.claimed ? `<span class="pill good">claimed ${shortDate(t.claimed)}</span> <button class="btn sm ghost unclaim">undo</button>` : '<button class="btn sm danger unexp">not an expense</button>'}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+    ${state.claims.length ? `<div class="card"><div class="cardhead"><h3>Claim sheets created</h3></div><div class="tw"><table><thead><tr><th>Date</th><th>Claimed from</th><th>By</th><th>Lines</th><th class="num">Total</th><th></th></tr></thead><tbody>${state.claims.slice().reverse().map(c => `<tr><td class="num">${shortDate(c.date)}</td><td>${esc(c.from)}</td><td>${esc(c.by)}</td><td class="num">${c.ids.length}</td><td class="num">${gbp(c.total)}</td><td><button class="btn sm ghost" data-reclaim="${c.id}">Download again</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    <div id="claimPreview"></div>
+  </div>`;
+  $$('#expFrom .chip').forEach(b => b.onclick = () => { f.from = b.dataset.from; render(); });
+  $$('#expStatus .chip').forEach(b => b.onclick = () => { f.status = b.dataset.status; render(); });
+  $('#selAll').onclick = () => { rows.forEach(t => { if (!t.claimed) f.sel[t.id] = true; }); render(); };
+  $('#selNone').onclick = () => { f.sel = {}; render(); };
+  $$('#expTable tr[data-id]').forEach(tr => {
+    const id = tr.dataset.id;
+    $('input.pick', tr).onchange = e => { if (e.target.checked) f.sel[id] = true; else delete f.sel[id]; const n = Object.keys(f.sel).length; const b = $('#makeClaim'); b.disabled = !n; const st = r2(-allTx().filter(t => f.sel[t.id]).reduce((a, t) => a + t.v, 0)); b.textContent = `Create claim sheet (${n} · ${gbp(st)})`; };
+    $('select.from', tr).onchange = e => { state.over[id] = Object.assign({}, state.over[id], { from: e.target.value }); persist(); };
+    $('input.note', tr).onchange = e => setNote(id, e.target.value);
+    const ux = $('button.unexp', tr); if (ux) ux.onclick = () => { state.over[id] = Object.assign({}, state.over[id], { exp: false }); const t = findTx(id); if (t) state.payeeExp[t.pk] = { exp: false }; persist(); render(); };
+    const un = $('button.unclaim', tr); if (un) un.onclick = () => { state.over[id] = Object.assign({}, state.over[id], { claimed: null }); persist(); render(); };
+    const rc = $('a.rcpt', tr); if (rc) rc.onclick = e => { e.preventDefault(); $('#claimPreview').innerHTML = `<div class="card"><div class="cardhead"><h3>Receipt</h3><button class="btn sm ghost" id="closeR">Close</button></div><img src="${receipts[id]}" alt="receipt" style="max-width:100%;border-radius:8px"></div>`; $('#closeR').onclick = () => $('#claimPreview').innerHTML = ''; window.scrollTo(0, document.body.scrollHeight); };
+  });
+  let pendingReceipt = null;
+  $('#eReceipt').onchange = async e => { const file = e.target.files[0]; if (!file) return; pendingReceipt = await shrinkImage(file); $('#eReceiptName').textContent = pendingReceipt ? 'receipt attached' : 'could not read image'; };
+  $('#expForm').onsubmit = e => { e.preventDefault(); const id = 'e' + Date.now().toString(36); state.bills.push({ id, date: $('#eDate').value, payee: $('#ePayee').value.trim(), amount: +$('#eAmount').value, account: $('#eAcc').value, category: $('#eCat').value === '__new__' ? 'Work Expense' : $('#eCat').value, note: $('#eNote').value.trim(), type: 'unexpected', exp: true, from: $('#eFrom').value, receipt: !!pendingReceipt }); if (pendingReceipt) saveReceipt(id, pendingReceipt); persist(); render(); toast('Expense added'); };
+  $('#makeClaim').onclick = () => { const sel = allTx().filter(t => f.sel[t.id] && t.exp && !t.claimed); if (!sel.length) return; const froms = Array.from(new Set(sel.map(t => t.claimFrom))); if (froms.length > 1) { toast('Select lines for one claimant at a time (' + froms.join(', ') + ')'); return; } createClaim(sel, froms[0]); };
+  $$('[data-reclaim]').forEach(b => b.onclick = () => { const c = state.claims.find(x => x.id === b.dataset.reclaim); if (!c) return; const sel = allTx().filter(t => c.ids.includes(t.id)); claimSheet(sel, c); });
+}
+async function createClaim(sel, from) {
+  const claim = { id: 'c' + Date.now().toString(36), date: todayISO(), from, by: session.user || 'Ajay Kawa', ids: sel.map(t => t.id), total: r2(-sel.reduce((a, t) => a + t.v, 0)) };
+  await claimSheet(sel, claim);
+  for (const t of sel) state.over[t.id] = Object.assign({}, state.over[t.id], { claimed: claim.date });
+  state.claims.push(claim); view.expFilter.sel = {}; persist(); render(); toast('Claim sheet created and lines marked as claimed');
+}
+async function claimSheet(sel, claim) {
+  const rows = [['Expense claim', ''], ['Claimant', claim.by], ['Claim from', claim.from], ['Date', claim.date], [],
+    ['Date', 'Payee', 'Description', 'Category', 'Paid from', 'Receipt', 'Amount'],
+    ...sel.slice().sort((a, b) => a.d.localeCompare(b.d)).map(t => [t.d, t.p, [t.r, t.note].filter(Boolean).join(' · '), t.cat, accName(t.a), 'Yes', -t.v]),
+    ['', '', '', '', '', 'Total', claim.total]];
+  $('#claimPreview').innerHTML = `<div class="card"><div class="cardhead"><h3>Claim sheet · ${esc(claim.from)}</h3><span class="small muted">${claim.by} · ${claim.date}</span></div><div class="tw"><table><thead><tr>${rows[5].map(h => `<th${h === 'Amount' ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.slice(6).map(r => `<tr class="${r[5] === 'Total' ? 'total' : ''}">${r.map((v, i) => `<td class="${i === 6 ? 'num' : ''}">${typeof v === 'number' ? gbp(v) : esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  if (typeof JSZip === 'undefined') { toast('Excel needs an internet connection; the sheet is shown on screen'); return; }
+  await writeXlsx(`Expense claim ${claim.from.replace(/[^A-Za-z0-9 ]/g, '')} ${claim.date}.xlsx`, [['Claim', rows]], { boldRow: 5 });
+}
+
 /* ---- SETTINGS ---- */
 function renderSettings(main) {
   const s = state.settings;
@@ -1142,6 +1354,11 @@ function renderSettings(main) {
         <div class="toolbar" style="margin-top:8px"><button class="btn" id="exportXlsx">Download Excel</button><button class="btn ghost" id="exportJson">Backup (JSON)</button><label class="btn ghost" style="cursor:pointer">Restore backup<input type="file" id="importJson" accept=".json" class="hide"></label></div>
         <div id="exportMsg" class="small muted" style="margin-top:6px"></div>
       </div>
+      <div class="card"><h3>Who expenses are claimed from</h3><div class="help">One per line.</div><textarea id="claimFrom" rows="4" style="width:100%;margin-top:6px">${esc(state.settings.claimFrom.join('\n'))}</textarea><div class="toolbar" style="margin-top:6px"><button class="btn ghost" id="saveClaimFrom">Save list</button></div></div>
+      <div class="card"><h3>Categories</h3><div class="help">Your own categories appear in every category list. Built-in ones cannot be removed.</div>
+        <div class="toolbar" style="margin-top:8px"><input type="text" id="ncName" placeholder="New category"><select id="ncGroup"><option value="variable">Everyday spend</option><option value="fixed">Fixed cost</option><option value="transfer">Transfer (ignored)</option><option value="income">Income</option></select><button class="btn ghost" id="ncAdd">Add</button></div>
+        ${(state.customCats || []).length ? `<div class="chips" style="margin-top:8px">${state.customCats.map(c => `<span class="chip">${esc(c.name)} <button class="btn sm danger" data-delcat="${esc(c.name)}" style="padding:0 6px">×</button></span>`).join('')}</div>` : ''}
+      </div>
       <div class="card"><h3>Accounts</h3><div class="tw"><table><thead><tr><th>Account</th><th>Bank</th><th>Number</th><th>Owner</th></tr></thead><tbody>${ACCOUNTS.filter(a => a.type !== 'manual').map(a => `<tr><td class="payee">${a.name}</td><td>${a.bank}</td><td class="num">${a.last4 ? '•••• ' + a.last4 : '—'}</td><td>${esc(a.owner)}</td></tr>`).join('')}</tbody></table></div>
         <div class="toolbar" style="margin-top:10px"><button class="btn danger sm" id="resetAll">Reset categories, notes and uploads</button></div>
       </div>
@@ -1149,10 +1366,13 @@ function renderSettings(main) {
   </div>`;
   $('#saveSettings').onclick = () => { s.incomeThinc = +$('#sThinc').value || 0; s.incomeOneHolidays = +$('#sOne').value || 0; s.rent = +$('#sRent').value || 0; s.vat = +$('#sVat').value || 0; s.startMonth = $('#sStart').value.trim() || '2026-09'; persist(); toast('Settings saved'); };
   $('#savePin').onclick = () => { const p = $('#newPin').value.trim(); if (!/^\d{4,8}$/.test(p)) return toast('PIN must be 4 to 8 digits'); s.pin = p; persist(); $('#newPin').value = ''; toast('PIN changed'); };
+  $('#saveClaimFrom').onclick = () => { const l = $('#claimFrom').value.split('\n').map(x => x.trim()).filter(Boolean); if (l.length) { state.settings.claimFrom = l; persist(); render(); toast('Saved'); } };
+  $('#ncAdd').onclick = () => { const n = $('#ncName').value.trim(); if (!n) return; addCategory(n, $('#ncGroup').value); render(); toast('Category added'); };
+  $$('[data-delcat]').forEach(b => b.onclick = () => { state.customCats = state.customCats.filter(c => c.name !== b.dataset.delcat); persist(); render(); });
   $('#exportXlsx').onclick = exportExcel;
-  $('#exportJson').onclick = () => deliverFile('kawa-budget-backup.json', JSON.stringify(state));
+  $('#exportJson').onclick = () => deliverFile('moneyhub-backup.json', JSON.stringify(state));
   $('#importJson').onchange = async e => { try { const f = e.target.files[0]; const s2 = JSON.parse(await f.text()); if (s2.v !== 1) throw new Error('Not a Kawa backup'); state = Object.assign(state, s2); persist(); render(); toast('Backup restored'); } catch (err) { toast('Could not restore: ' + err.message); } };
-  $('#resetAll').onclick = () => { const b = $('#resetAll'); if (b.dataset.arm) { state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], settings: Object.assign({}, DEFAULT_SETTINGS, { pin: state.settings.pin }), updatedAt: 0 }; persist(); render(); toast('Reset done'); } else { b.dataset.arm = '1'; b.textContent = 'Tap again to confirm reset'; } };
+  $('#resetAll').onclick = () => { const b = $('#resetAll'); if (b.dataset.arm) { state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], customCats: [], plan: {}, payeeType: {}, payeeExp: {}, claims: [], settings: Object.assign({}, DEFAULT_SETTINGS, { pin: state.settings.pin }), updatedAt: 0 }; persist(); render(); toast('Reset done'); } else { b.dataset.arm = '1'; b.textContent = 'Tap again to confirm reset'; } };
 }
 async function deliverFile(name, data) {
   const msg = $('#exportMsg');
@@ -1163,12 +1383,11 @@ async function deliverFile(name, data) {
 /* ---- Excel export (minimal .xlsx writer, Aptos 12) ---- */
 async function exportExcel() {
   if (typeof JSZip === 'undefined') { toast('Excel export needs an internet connection'); return; }
-  const zip = new JSZip();
   const sheets = [];
   const ms = months(); const ym = view.month;
   const s = summary(ym);
   sheets.push(['Summary ' + monthLabel(ym), [
-    ['Kawa Budget Platform', monthLabel(ym)], [],
+    ['MoneyHub – The Kawa Family', monthLabel(ym)], [],
     ['Income received', s.income], ['Income (one-off)', s.incomeOne], ['Expected income', s.expected], [],
     ['Fixed costs', s.fixed], ['VAT set-aside', s.vat], ['Zilch / Clearpay', s.bnpl], ['Everyday spend', s.variable], ['One-off payments', s.oneoffs], ['Total outgoings', s.out], [],
     [s.spare < 0 ? 'Shortfall' : 'Spare income', s.spare], [],
@@ -1180,10 +1399,14 @@ async function exportExcel() {
   for (const a of ACCOUNTS) {
     const rows = allTx().filter(t => t.a === a.id);
     if (!rows.length) continue;
-    sheets.push([a.name.slice(0, 31), [['Date', 'Payee', 'Reference', 'Type', 'Category', 'Regular', 'One-off', 'Note', 'Amount'], ...rows.map(t => [t.d, t.p, t.r || '', t.k, t.cat, t.recurring ? 'Yes' : '', t.oneoff ? 'Yes' : '', t.note || '', t.v])]]);
+    sheets.push([a.name.slice(0, 31), [['Date', 'Payee', 'Reference', 'Bank type', 'Category', 'Type', 'Work expense', 'Claim from', 'Note', 'Amount'], ...rows.map(t => [t.d, t.p, t.r || '', t.k, t.cat, (TYPES.find(x => x[0] === t.type) || [])[1] || '', t.exp ? 'Yes' : '', t.exp ? t.claimFrom : '', t.note || '', t.v])]]);
   }
+  await writeXlsx(`MoneyHub ${ym}.xlsx`, sheets, {});
+}
+async function writeXlsx(filename, sheets, opts) {
+  const zip = new JSZip(); const boldRow = opts.boldRow != null ? opts.boldRow : 0;
   const xmlEsc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const sheetXml = rows => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="2" width="30" customWidth="1"/><col min="3" max="12" width="18" customWidth="1"/></cols><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => { const ref = colName(j) + (i + 1); if (v === '' || v == null) return ''; if (typeof v === 'number') return `<c r="${ref}" s="1"><v>${v}</v></c>`; return `<c r="${ref}" t="inlineStr" s="${i === 0 ? 2 : 0}"><is><t>${xmlEsc(v)}</t></is></c>`; }).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const sheetXml = rows => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="2" width="30" customWidth="1"/><col min="3" max="12" width="18" customWidth="1"/></cols><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => { const ref = colName(j) + (i + 1); if (v === '' || v == null) return ''; if (typeof v === 'number') return `<c r="${ref}" s="1"><v>${v}</v></c>`; return `<c r="${ref}" t="inlineStr" s="${i === boldRow ? 2 : 0}"><is><t>${xmlEsc(v)}</t></is></c>`; }).join('')}</row>`).join('')}</sheetData></worksheet>`;
   zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
   zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
   zip.file('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh, i) => `<sheet name="${xmlEsc(sh[0].replace(/[\[\]\*\?\/\\:]/g, ' '))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
@@ -1191,7 +1414,7 @@ async function exportExcel() {
   zip.file('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;£&quot;#,##0.00;[Red]-&quot;£&quot;#,##0.00"/></numFmts><fonts count="2"><font><sz val="12"/><name val="Aptos"/></font><font><b/><sz val="12"/><name val="Aptos"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`);
   sheets.forEach((sh, i) => zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(sh[1])));
   const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  await deliverFile(`Kawa Budget ${ym}.xlsx`, blob);
+  await deliverFile(filename, blob);
 }
 function colName(j) { let s = ''; j++; while (j > 0) { const m = (j - 1) % 26; s = String.fromCharCode(65 + m) + s; j = Math.floor((j - 1) / 26); } return s; }
 
@@ -1209,9 +1432,9 @@ $('#loginForm').onsubmit = e => {
 };
 $('#switchUser').onclick = () => { session = { user: null }; try { localStorage.removeItem('kawa.session'); } catch (e) { } showLogin(); };
 (function manifest() {
-  return; try { const m = { name: 'Kawa Budget Platform', short_name: 'Kawa Budget', display: 'standalone', start_url: location.href.split('#')[0], background_color: '#f3f6f4', theme_color: '#0f5c4a', icons: [{ src: 'data:image/png;base64,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', sizes: '512x512', type: 'image/png' }, { src: 'data:image/png;base64,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', sizes: '180x180', type: 'image/png' }] }; $('#manifestLink').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(m)); } catch (e) { }
+  return; try { const m = { name: 'MoneyHub – The Kawa Family', short_name: 'MoneyHub', display: 'standalone', start_url: location.href.split('#')[0], background_color: '#f3f6f4', theme_color: '#0f5c4a', icons: [{ src: 'data:image/png;base64,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', sizes: '512x512', type: 'image/png' }, { src: 'data:image/png;base64,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', sizes: '180x180', type: 'image/png' }] }; $('#manifestLink').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(m)); } catch (e) { }
 })();
-loadLocal();
+loadLocal(); ensureState(); loadReceipts();
 if (session.user && session.at && Date.now() - session.at < 1000 * 60 * 60 * 24 * 30) showApp(); else showLogin();
 connectDb();
 window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!$('#app').classList.contains('hide')) render(); });

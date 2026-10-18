@@ -1,6 +1,6 @@
 {
-  "name": "Kawa Budget Platform",
-  "short_name": "Kawa Budget",
+  "name": "MoneyHub – The Kawa Family",
+  "short_name": "MoneyHub",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

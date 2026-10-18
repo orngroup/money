@@ -1,4 +1,4 @@
-# Kawa Budget Platform
+# MoneyHub – The Kawa Family
 
 Household budget dashboard for Ajay and Louise. Single-page app, no server.
 
