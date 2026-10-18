@@ -1314,13 +1314,19 @@ function forecast(ym) {
     const surplus = r2(income + extraIn + tIn - tOut - fixed - bnpl - extras - goals);
     return { a, income, opening, fixed, fixedRows, tOut, tIn, bnpl, extras, extraIn, goals, surplus, end: r2(opening + surplus), defIncome, defBnpl: baseBnpl[a.id] || 0 };
   });
-  const tot = k => r2(out.reduce((x, o) => x + o[k], 0));
+  const tot = (k, f) => r2(out.filter(f || (() => true)).reduce((x, o) => x + o[k], 0));
+  const isOH = o => o.a.id === 'oneholidays'; const isHH = o => !isOH(o);
   const budgets = Object.entries(pl.budgets || {}).map(([cat, amt]) => ({ cat, amt: +amt || 0 }));
   const budgetTotal = r2(budgets.reduce((x, b) => x + b.amt, 0));
-  const surplus = r2(tot('income') + tot('extraIn') - tot('fixed') - tot('bnpl') - tot('extras') - tot('goals'));
+  const oh = { income: tot('income', isOH), extraIn: tot('extraIn', isOH), fixed: tot('fixed', isOH), bnpl: tot('bnpl', isOH), extras: tot('extras', isOH), goals: tot('goals', isOH), tIn: tot('tIn', isOH), tOut: tot('tOut', isOH), rows: out.filter(isOH).flatMap(o => o.fixedRows) };
+  oh.surplus = r2(oh.income + oh.extraIn + oh.tIn - oh.tOut - oh.fixed - oh.bnpl - oh.extras - oh.goals);
+  oh.topUp = oh.surplus < 0 ? r2(-oh.surplus) : 0;
+  const hh = { income: tot('income', isHH), extraIn: tot('extraIn', isHH), fixed: tot('fixed', isHH), bnpl: tot('bnpl', isHH), extras: tot('extras', isHH), goals: tot('goals', isHH) };
+  hh.surplus = r2(hh.income + hh.extraIn - hh.fixed - hh.bnpl - hh.extras - hh.goals - oh.topUp);
+  const surplus = hh.surplus;
   // actuals for the forecast month, if statements cover it
   const act = summary(ym); const hasActual = act.tx.length > 0;
-  return { ym, bm, accounts: out, income: tot('income'), extraIn: tot('extraIn'), fixed: tot('fixed'), bnpl: tot('bnpl'), extras: tot('extras'), goals: tot('goals'), drawsOut: r2(dr.reduce((x, d) => x + d.amount, 0)), surplus, budgets, budgetTotal, remaining: r2(surplus - budgetTotal), baseVarCat, base, act, hasActual };
+  return { ym, bm, accounts: out, oh, hh, income: tot('income'), extraIn: tot('extraIn'), fixed: tot('fixed'), bnpl: tot('bnpl'), extras: tot('extras'), goals: tot('goals'), drawsOut: r2(dr.reduce((x, d) => x + d.amount, 0)), surplus, budgets, budgetTotal, remaining: r2(surplus - budgetTotal), baseVarCat, base, act, hasActual };
 }
 function cashflow(ym, fc) {
   const pl = planFor(ym); const daysIn = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
@@ -1331,6 +1337,7 @@ function cashflow(ym, fc) {
     if (o.bnpl) ev.push({ day: 1, acc: o.a.id, label: 'Zilch / Clearpay estimate (spread)', amt: -o.bnpl, kind: 'estimate', spread: true });
   }
   for (const d of draws()) { ev.push({ day: d.day || 4, acc: d.from, label: d.label, amt: -d.amount, kind: 'Pay ourselves' }); ev.push({ day: d.day || 4, acc: d.to, label: d.label, amt: d.amount, kind: 'Pay ourselves' }); }
+  if (fc.oh && fc.oh.topUp) { const rent = fc.oh.rows.find(r => /THINC DIGITAL/i.test(r.payee)); const day = rent ? rent.day : 4; ev.push({ day, acc: 'thinc', label: 'Top-up to One Holidays', amt: -fc.oh.topUp, kind: 'top-up' }); ev.push({ day, acc: 'oneholidays', label: 'Top-up from Thinc', amt: fc.oh.topUp, kind: 'top-up' }); }
   for (const e of pl.extras) ev.push({ day: e.day || 1, acc: e.acc, label: e.payee, amt: e.kind === 'income' ? e.amount : -e.amount, kind: 'extra' });
   for (const g of goalMonthly()) if (g.monthly) { const goal = state.goals.find(x => x.id === g.id); ev.push({ day: 25, acc: g.acc, label: 'Savings: ' + (goal ? goal.name : ''), amt: -g.monthly, kind: 'savings' }); }
   // spread BNPL estimate evenly across the month
@@ -1358,29 +1365,43 @@ function renderPlan(main) {
   const catOptions = allCats().filter(c => (catGroup(c) === 'variable' || catGroup(c) === 'fixed') && c !== 'To categorise' && c !== 'Work Expense');
   main.innerHTML = `<div class="section">
     <div class="toolbar"><h1>Planner</h1><div class="spacer"></div><label class="small muted">Month ${monthSelect('planMonth', ym, future)}</label><label class="small muted">estimates from ${monthSelect('planBase', bm, ms)}</label></div>
-    <div class="help">Built only from what we know: fixed income, what we pay ourselves, direct debits, standing orders and payments marked Regular on the Review page, the Zilch/Clearpay estimate, savings targets and planned extras. Nothing ad hoc. The surplus is what is left to budget; set budgets below and track them as statements come in.</div>
+    <div class="help">Two pots. <b>One Holidays</b>: Itravelmix income, the consultancy/rent payment to Thinc Digital, the VAT set-aside and anything paid from that account; if it is short, the top-up comes from Thinc and is shown as a household cost. <b>Household</b>: ORN income into Thinc, what we pay ourselves, DDs, SOs and Regular payees from Review, the Zilch/Clearpay estimate, savings targets and planned extras. Nothing ad hoc. The household surplus is what is left to budget.</div>
     <div class="grid g4 tiles">
-      <div class="tile hero ${fc.surplus < 0 ? 'neg' : ''}"><div class="lbl">Surplus before budgets</div><div class="val num">${gbp(fc.surplus)}</div><div class="sub">income − set payments − Zilch/Clearpay − savings − extras</div></div>
+      <div class="tile hero ${fc.surplus < 0 ? 'neg' : ''}"><div class="lbl">Household surplus before budgets</div><div class="val num">${gbp(fc.surplus)}</div><div class="sub">Thinc + personal accounts, after any One Holidays top-up</div></div>
       <div class="tile ${fc.remaining < 0 ? 'hero neg' : ''}"><div class="lbl">Left after budgets</div><div class="val num">${gbp(fc.remaining)}</div><div class="sub">budgets set ${gbp(fc.budgetTotal, { dp: 0 })}</div></div>
-      <div class="tile"><div class="lbl">Income</div><div class="val num">${gbp(r2(fc.income + fc.extraIn))}</div><div class="sub">fixed ${gbp(fc.income, { dp: 0 })}${fc.extraIn ? ` + one-off ${gbp(fc.extraIn, { dp: 0 })}` : ''}</div></div>
-      <div class="tile"><div class="lbl">Set payments</div><div class="val num">${gbp(fc.fixed)}</div><div class="sub">DDs, SOs, regulars, VAT, card minimums</div></div>
+      <div class="tile"><div class="lbl">Household income (ORN)</div><div class="val num">${gbp(r2(fc.hh.income + fc.hh.extraIn))}</div><div class="sub">fixed ${gbp(fc.hh.income, { dp: 0 })}${fc.hh.extraIn ? ` + one-off ${gbp(fc.hh.extraIn, { dp: 0 })}` : ''}</div></div>
+      <div class="tile ${fc.oh.topUp ? 'hero neg' : ''}"><div class="lbl">One Holidays ${fc.oh.topUp ? 'top-up needed' : 'surplus'}</div><div class="val num">${gbp(fc.oh.topUp || fc.oh.surplus)}</div><div class="sub">Itravelmix ${gbp(fc.oh.income, { dp: 0 })} − rent, VAT &amp; One Holidays costs</div></div>
+      <div class="tile"><div class="lbl">Set payments (household)</div><div class="val num">${gbp(fc.hh.fixed)}</div><div class="sub">DDs, SOs, regulars, card minimums</div></div>
       <div class="tile"><div class="lbl">Pay ourselves</div><div class="val num">${gbp(fc.drawsOut)}</div><div class="sub">salaries + dividends (stays in the household)</div></div>
       <div class="tile"><div class="lbl">Zilch / Clearpay estimate</div><div class="val num">${gbp(fc.bnpl)}</div><div class="sub">edit per account below</div></div>
       <div class="tile"><div class="lbl">Savings targets</div><div class="val num">${gbp(fc.goals)}</div><div class="sub">from the Savings page</div></div>
       <div class="tile"><div class="lbl">Planned extras</div><div class="val num">${gbp(fc.extras)}</div><div class="sub">${fc.extraIn ? `plus ${gbp(fc.extraIn, { dp: 0 })} one-off income` : 'known one-offs'}</div></div>
     </div>
-    <div class="card"><div class="cardhead"><h2>Household waterfall · ${monthLabel(ym)}</h2></div><div class="tw"><table class="wf"><tbody>
-      <tr><td>Fixed income (ORN into Thinc, Itravelmix into One Holidays)</td><td class="num pos">${gbp(fc.income, { sign: true })}</td></tr>
-      ${fc.extraIn ? `<tr><td>One-off income</td><td class="num pos">${gbp(fc.extraIn, { sign: true })}</td></tr>` : ''}
+    <div class="grid g2">
+    <div class="card"><div class="cardhead"><h2>One Holidays pot · ${monthLabel(ym)}</h2><span class="small muted">kept separate: rent, VAT and One Holidays costs only</span></div><div class="tw"><table class="wf"><tbody>
+      <tr><td>Itravelmix income (inc VAT)</td><td class="num pos">${gbp(fc.oh.income, { sign: true })}</td></tr>
+      ${fc.oh.extraIn ? `<tr><td>One-off income</td><td class="num pos">${gbp(fc.oh.extraIn, { sign: true })}</td></tr>` : ''}
+      ${fc.oh.tIn ? `<tr><td>Transfers in</td><td class="num pos">${gbp(fc.oh.tIn, { sign: true })}</td></tr>` : ''}
+      ${fc.oh.rows.map(r => `<tr><td>${esc(r.payee)}<span class="ref"> · ${ordinal(r.day)}</span></td><td class="num">${gbp(-r.planAmt, { sign: true })}</td></tr>`).join('')}
+      ${fc.oh.tOut ? `<tr><td>Pay ourselves from One Holidays</td><td class="num">${gbp(-fc.oh.tOut, { sign: true })}</td></tr>` : ''}
+      ${fc.oh.bnpl ? `<tr><td>Zilch / Clearpay on this account</td><td class="num">${gbp(-fc.oh.bnpl, { sign: true })}</td></tr>` : ''}
+      ${fc.oh.extras ? `<tr><td>Planned extras</td><td class="num">${gbp(-fc.oh.extras, { sign: true })}</td></tr>` : ''}
+      <tr class="total"><td>${fc.oh.topUp ? 'Shortfall – top up from Thinc' : 'One Holidays surplus'}</td><td class="num ${fc.oh.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.oh.surplus, { sign: true })}</td></tr>
+    </tbody></table></div><div class="help">Everything paid from the One Holidays account counts here, not against the household. Mark One Holidays expenses on Review and they stay in this pot.</div></div>
+    <div class="card"><div class="cardhead"><h2>Household pot · ${monthLabel(ym)}</h2><span class="small muted">Thinc + personal accounts</span></div><div class="tw"><table class="wf"><tbody>
+      <tr><td>ORN income into Thinc</td><td class="num pos">${gbp(fc.hh.income, { sign: true })}</td></tr>
+      ${fc.hh.extraIn ? `<tr><td>One-off income</td><td class="num pos">${gbp(fc.hh.extraIn, { sign: true })}</td></tr>` : ''}
       <tr class="sub"><td>Pay ourselves: ${dr.filter(d => d.on !== false).map(d => esc(d.label) + ' ' + gbp(d.amount, { dp: 0 })).join(', ') || 'none set'}</td><td class="num">(${gbp(fc.drawsOut)} moved between our accounts)</td></tr>
-      <tr><td>Direct debits, standing orders and regular payments</td><td class="num">${gbp(-fc.fixed, { sign: true })}</td></tr>
-      <tr><td>Zilch / Clearpay instalments (estimate)</td><td class="num">${gbp(-fc.bnpl, { sign: true })}</td></tr>
-      <tr><td>Savings targets</td><td class="num">${gbp(-fc.goals, { sign: true })}</td></tr>
-      <tr><td>Planned extras</td><td class="num">${gbp(-fc.extras, { sign: true })}</td></tr>
-      <tr class="total"><td>Surplus to budget</td><td class="num ${fc.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.surplus, { sign: true })}</td></tr>
+      <tr><td>Direct debits, standing orders and regular payments</td><td class="num">${gbp(-fc.hh.fixed, { sign: true })}</td></tr>
+      <tr><td>Zilch / Clearpay instalments (estimate)</td><td class="num">${gbp(-fc.hh.bnpl, { sign: true })}</td></tr>
+      <tr><td>Savings targets</td><td class="num">${gbp(-fc.hh.goals, { sign: true })}</td></tr>
+      <tr><td>Planned extras</td><td class="num">${gbp(-fc.hh.extras, { sign: true })}</td></tr>
+      ${fc.oh.topUp ? `<tr><td>Top-up to One Holidays (rent / VAT shortfall)</td><td class="num">${gbp(-fc.oh.topUp, { sign: true })}</td></tr>` : ''}
+      <tr class="total"><td>Household surplus to budget</td><td class="num ${fc.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.surplus, { sign: true })}</td></tr>
       <tr><td>Budgets set for the month</td><td class="num">${gbp(-fc.budgetTotal, { sign: true })}</td></tr>
       <tr class="total"><td>Left after budgets</td><td class="num ${fc.remaining < 0 ? 'neg' : 'pos'}">${gbp(fc.remaining, { sign: true })}</td></tr>
     </tbody></table></div></div>
+    </div>
     <div class="card"><div class="cardhead"><h2>Budgets for ${monthLabel(ym)}</h2><span class="small muted">${fc.hasActual ? `${Math.round(elapsed * 100)}% of the month elapsed · actuals from uploaded statements` : 'actuals appear once statements for this month are uploaded'}</span></div>
       <div class="tw"><table id="budgetTable"><thead><tr><th>Category</th><th class="num">Last month</th><th class="num">Budget</th><th class="num">Spent so far</th><th class="num">Left</th><th style="min-width:160px">Progress</th><th></th></tr></thead><tbody>
         ${fc.budgets.map(b => { const spent = fc.hasActual ? r2(fc.act.byCat[b.cat] || 0) : 0; const left = r2(b.amt - spent); const pct = b.amt ? Math.min(100, Math.round(spent / b.amt * 100)) : 0; const over = spent > b.amt || (elapsed > 0 && pct > elapsed * 100 + 10); return `<tr data-cat="${esc(b.cat)}"><td><i class="dot" style="background:${catColor(b.cat)}"></i>${esc(b.cat)}</td><td class="num muted">${gbp(fc.baseVarCat[b.cat] || fc.base.byCat[b.cat] || 0)}</td><td class="num"><input class="bamt" type="number" step="1" value="${b.amt}" style="width:95px;text-align:right"></td><td class="num">${fc.hasActual ? gbp(spent) : '—'}</td><td class="num ${left < 0 ? 'neg' : ''}">${fc.hasActual ? gbp(left) : '—'}</td><td><div class="stripe" style="height:8px;position:relative"><i style="width:${pct}%;background:${over ? 'var(--bad)' : 'var(--good)'}"></i>${elapsed > 0 && elapsed < 1 ? `<span style="position:absolute;left:${Math.round(elapsed * 100)}%;top:-3px;width:2px;height:14px;background:var(--fg)" title="today"></span>` : ''}</div></td><td><button class="btn sm ghost brm">Remove</button></td></tr>`; }).join('')}
