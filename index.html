@@ -116,6 +116,9 @@ input[type=file]{max-width:100%}
 .pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.n{background:var(--accent-soft);color:var(--accent)}
 
 /* tables */
+.bulk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;margin-bottom:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.bulk select{font-size:12px;padding:4px 6px}
+td input.pick{width:16px;height:16px}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line-strong);white-space:nowrap}
@@ -977,11 +980,44 @@ function txTable(rows, o) {
   o = o || {};
   if (!rows.length) return '<div class="muted small">Nothing here.</div>';
   const total = r2(rows.reduce((a, t) => a + t.v, 0));
-  return `<div class="tw"><table class="txt"><thead><tr><th>Date</th>${o.showAcc ? '<th>Account</th>' : ''}<th>Payee</th><th>Category</th><th>Type</th><th>Need</th><th>Work exp.</th><th>Note</th><th>Action</th><th class="num">Amount</th></tr></thead><tbody>
-  ${rows.map(t => `<tr data-id="${t.id}"><td class="num" title="${t.d}" data-v="${t.d}">${shortDate(t.d)}</td>${o.showAcc ? `<td class="small">${esc(accName(t.a))}</td>` : ''}<td><span class="payee">${esc(t.p)}</span>${t.r ? `<div class="ref">${esc(t.r)}</div>` : ''}${t.k === 'DD' || t.k === 'SO' ? ` <span class="pill n">${t.k}</span>` : ''}</td><td>${catSelect('cat', t.cat)}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === t.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td>${t.v < 0 && t.group !== 'transfer' ? `<select class="ess"><option value="1" ${t.ess ? 'selected' : ''}>Essential</option><option value="0" ${t.ess ? '' : 'selected'}>Optional</option></select>` : ''}</td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${t.exp ? 'checked' : ''} title="Reclaimable work expense"> <select class="from" ${t.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === t.claimFrom ? 'selected' : ''}>${c}</option>`).join('')}<option value="__new__">＋ New…</option></select>${t.claimed ? ' <span class="pill good">claimed</span>' : ''}</td><td><input class="note" type="text" value="${esc(t.note)}" placeholder="e.g. St Mary's entrance test"></td><td style="white-space:nowrap">${t.v < 0 && t.group !== 'transfer' ? `<select class="act"><option value="">${t.action ? '✓ ' + (t.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(t.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${t.action ? '<option value="clear">Undo action</option>' : ''}</select>` : ''}</td><td class="num ${t.v < 0 ? '' : 'pos'}" data-v="${t.v}">${gbp(t.v, { sign: true })}</td></tr>`).join('')}
-  <tr class="total"><td colspan="${o.showAcc ? 9 : 8}">Total (${rows.length})</td><td class="num">${gbp(total, { sign: true })}</td></tr></tbody></table></div>`;
+  const bid = 'b' + Math.random().toString(36).slice(2, 8);
+  return `<div class="bulk" data-bulk="${bid}"><label class="small"><input type="checkbox" class="selall"> Select all shown</label><span class="small muted sel-count">0 selected</span>
+    <select class="bcat"><option value="">Set category…</option>${allCats().map(c => `<option>${c}</option>`).join('')}</select>
+    <select class="btyp"><option value="">Set type…</option>${TYPES.map(x => `<option value="${x[0]}">${x[1]}</option>`).join('')}</select>
+    <select class="bess"><option value="">Set need…</option><option value="1">Essential</option><option value="0">Optional</option></select>
+    <select class="bexp"><option value="">Work expense…</option>${state.settings.claimFrom.map(c => `<option value="${esc(c)}">Yes – ${esc(c)}</option>`).join('')}<option value="__no__">No</option></select>
+    <select class="bact"><option value="">Action…</option><option value="cancel">Cancel from next month</option>${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="switch:${a.id}">Switch to ${a.name}</option>`).join('')}<option value="clear">Undo action</option></select>
+    <label class="small"><input type="checkbox" class="bremember" checked> remember for these payees</label><button class="btn sm bapply" disabled>Apply to selected</button></div>
+  <div class="tw"><table class="txt" data-bulk="${bid}"><thead><tr><th></th><th>Date</th>${o.showAcc ? '<th>Account</th>' : ''}<th>Payee</th><th class="num">Amount</th><th>Category</th><th>Type</th><th>Need</th><th>Work exp.</th><th>Note</th><th>Action</th></tr></thead><tbody>
+  ${rows.map(t => `<tr data-id="${t.id}"><td><input type="checkbox" class="pick"></td><td class="num" title="${t.d}" data-v="${t.d}">${shortDate(t.d)}</td>${o.showAcc ? `<td class="small">${esc(accName(t.a))}</td>` : ''}<td><span class="payee">${esc(t.p)}</span>${t.r ? `<div class="ref">${esc(t.r)}</div>` : ''}${t.k === 'DD' || t.k === 'SO' ? ` <span class="pill n">${t.k}</span>` : ''}</td><td class="num ${t.v < 0 ? '' : 'pos'}" data-v="${t.v}"><b>${gbp(t.v, { sign: true })}</b></td><td>${catSelect('cat', t.cat)}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === t.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td>${t.v < 0 && t.group !== 'transfer' ? `<select class="ess"><option value="1" ${t.ess ? 'selected' : ''}>Essential</option><option value="0" ${t.ess ? '' : 'selected'}>Optional</option></select>` : ''}</td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${t.exp ? 'checked' : ''} title="Reclaimable work expense"> <select class="from" ${t.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === t.claimFrom ? 'selected' : ''}>${c}</option>`).join('')}<option value="__new__">＋ New…</option></select>${t.claimed ? ' <span class="pill good">claimed</span>' : ''}</td><td><input class="note" type="text" value="${esc(t.note)}" placeholder="e.g. St Mary's entrance test"></td><td style="white-space:nowrap">${t.v < 0 && t.group !== 'transfer' ? `<select class="act"><option value="">${t.action ? '✓ ' + (t.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(t.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${t.action ? '<option value="clear">Undo action</option>' : ''}</select>` : ''}</td></tr>`).join('')}
+  <tr class="total"><td colspan="${o.showAcc ? 4 : 3}">Total (${rows.length})</td><td class="num">${gbp(total, { sign: true })}</td><td colspan="6"></td></tr></tbody></table></div>`;
 }
 function bindTxTables(root) {
+  $$('.bulk', root).forEach(bar => {
+    const table = $(`table.txt[data-bulk="${bar.dataset.bulk}"]`, root); if (!table) return;
+    const picks = () => $$('tr[data-id]:not([hidden]) input.pick', table);
+    const selected = () => picks().filter(c => c.checked).map(c => c.closest('tr').dataset.id);
+    const refresh = () => { const n = selected().length; $('.sel-count', bar).textContent = n + ' selected'; $('.bapply', bar).disabled = !n; };
+    $('.selall', bar).onchange = e => { picks().forEach(c => c.checked = e.target.checked); refresh(); };
+    table.addEventListener('change', e => { if (e.target.classList.contains('pick')) refresh(); });
+    $('.bapply', bar).onclick = () => {
+      const ids = selected(); if (!ids.length) return; const remember = $('.bremember', bar).checked;
+      const cat = $('.bcat', bar).value, typ = $('.btyp', bar).value, ess = $('.bess', bar).value, exp = $('.bexp', bar).value, act = $('.bact', bar).value;
+      if (!cat && !typ && !ess && !exp && !act) { toast('Choose what to set first'); return; }
+      const all = allTx();
+      for (const id of ids) {
+        const t = all.find(x => x.id === id); if (!t) continue; const o = state.over[id] = Object.assign({}, state.over[id]);
+        if (cat && cat !== '__new__') { o.c = cat; if (remember) state.payeeCat[t.pk] = cat; }
+        if (typ) { o.t = typ; if (remember) state.payeeType[t.pk] = typ; if (typ !== 'regular') state.notRecurring[t.pk] = true; else delete state.notRecurring[t.pk]; }
+        if (ess) { o.ess = ess === '1'; if (remember) state.payeeEss[t.pk] = ess === '1'; }
+        if (exp) { if (exp === '__no__') { o.exp = false; if (remember) state.payeeExp[t.pk] = { exp: false }; } else { o.exp = true; o.from = exp; if (remember) state.payeeExp[t.pk] = { exp: true, from: exp }; } }
+        if (act === 'cancel') upsertAction({ kind: 'cancel', key: t.a + '|' + t.pk, pk: t.pk, acc: t.a, payee: t.p, amount: -t.v });
+        else if (act.startsWith('switch:')) upsertAction({ kind: 'switch', key: t.a + '|' + t.pk, pk: t.pk, acc: t.a, to: act.slice(7), payee: t.p, amount: -t.v });
+        else if (act === 'clear') state.actions = state.actions.filter(x => x.key !== t.a + '|' + t.pk);
+      }
+      persist(); render(); toast(`Updated ${ids.length} transaction${ids.length > 1 ? 's' : ''}`);
+    };
+  });
   $$('table.txt tr[data-id]', root).forEach(tr => {
     const id = tr.dataset.id;
     $('select.cat', tr).onchange = e => { if (e.target.value === '__new__') { newCategoryInline(e.target, cat => setCategory(id, cat, tr)); return; } setCategory(id, e.target.value, tr); };
@@ -1120,7 +1156,7 @@ function renderTx(main) {
       <select id="fCat"><option value="all">All categories</option><option value="uncat" ${f.cat === 'uncat' ? 'selected' : ''}>To categorise (${uncat})</option>${allCats().map(c => `<option ${f.cat === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <input type="search" id="fQ" placeholder="Search payee or note" value="${esc(f.q)}">
     </div>
-    <div class="help">Change a category and the platform offers to remember it for that payee, so next month's statement is categorised automatically. Notes are saved per transaction.</div>
+    <div class="help">Tick several lines and use the bar above the table to set category, type, need, work expense or an action for all of them at once (and remember it for those payees). Changing a single line offers to remember the payee too. Notes are saved per transaction.</div>
     <div class="card">${txTable(rows.slice(0, 400), { showAcc: true })}${rows.length > 400 ? '<div class="small muted">Showing the first 400. Narrow the filter to see the rest.</div>' : ''}</div>
   </div>`;
   $('#fMonth').onchange = e => { f.month = e.target.value; render(); };
