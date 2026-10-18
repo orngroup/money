@@ -74,7 +74,7 @@ nav.side{border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-
 nav.side button,nav.bottom button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:9px 12px;font-weight:600;color:var(--muted)}
 nav.side button.on{background:var(--accent-soft);color:var(--accent)}
 nav.side svg,nav.bottom svg{width:18px;height:18px;flex:none}
-main{padding-block:18px 90px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0;max-width:1180px;width:100%}
+main{padding-block:18px 90px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0;max-width:1800px;width:100%}
 nav.bottom{display:none;position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--card);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px}
 nav.bottom button{flex:0 0 66px;width:66px}
 nav.bottom button{flex-direction:column;gap:3px;font-size:9px;padding:6px 1px;justify-content:center;text-align:center}
@@ -130,7 +130,13 @@ tr.filters th{padding:2px 4px;border-bottom:1px solid var(--line)} tr.filters in
 tr.sub td{color:var(--muted)}
 td select,td input{padding:4px 6px;font-size:12px;border-radius:6px}
 td input.note{width:100%;min-width:140px}
-td select.cat{max-width:190px}
+td select.cat{max-width:170px}
+td select{max-width:150px}
+td input.note{min-width:110px}
+.tw{scrollbar-width:thin}
+.tw::-webkit-scrollbar{height:10px}
+.tw::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:5px}
+.scrollhint{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
 .payee{font-weight:600}
 .ref{color:var(--muted);font-size:11px}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
@@ -714,7 +720,7 @@ function ruleFor(tx) {
 
 /* ---------------- state ---------------- */
 const SEED = JSON.parse($('#seedData').textContent);
-const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, draws: [{ id: 'd1', label: 'Salary – Ajay', from: 'thinc', to: 'ajay_hsbc', amount: 1047.5, day: 4 }, { id: 'd2', label: 'Salary – Louise', from: 'thinc', to: 'louise_hsbc', amount: 1047.5, day: 4 }, { id: 'd3', label: 'Dividend – Ajay', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }, { id: 'd4', label: 'Dividend – Louise', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }], claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
+const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, incomeThincDay: 4, incomeOneDay: 16, draws: [{ id: 'd1', label: 'Salary – Ajay', from: 'thinc', to: 'ajay_hsbc', amount: 1047.5, day: 4 }, { id: 'd2', label: 'Salary – Louise', from: 'thinc', to: 'louise_hsbc', amount: 1047.5, day: 4 }, { id: 'd3', label: 'Dividend – Ajay', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }, { id: 'd4', label: 'Dividend – Louise', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }], claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
 const OPTIONAL_CATS = ['Beauty & Health', 'Clothing & Shopping', 'Eating Out & Takeaway', 'Lunch & Coffee', 'Entertainment', 'TV & Subscriptions', 'Gifts & Charity', 'Cash & Other'];
 const TYPES = [['regular', 'Regular'], ['everyday', 'Everyday'], ['oneoff', 'One-off'], ['unexpected', 'Unexpected']];
 let state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], customCats: [], plan: {}, settings: Object.assign({}, DEFAULT_SETTINGS), updatedAt: 0 };
@@ -897,6 +903,7 @@ function catSelect(cls, value) { return `<select class="${cls}">${allCats().map(
 const moneyVal = s => { const m = String(s).replace(/[,£\s]/g, '').replace('−', '-').match(/^-?\d+(\.\d+)?$/); return m ? parseFloat(m[0]) : null; };
 function cellVal(td) { if (!td || !td.dataset) return ''; if (td.dataset.v != null) return td.dataset.v; const ctl = td.querySelector('select, input[type=text], input[type=number], input[type=search]'); if (ctl) return ctl.tagName === 'SELECT' ? (ctl.selectedOptions[0] ? ctl.selectedOptions[0].text : '') : ctl.value; const cb = td.querySelector('input[type=checkbox]'); if (cb) return cb.checked ? 'yes' : 'no'; return td.innerText.trim(); }
 function enhanceTables(root) {
+  $$('.tw', root).forEach(tw => { const t = tw.querySelector('table'); if (t && t.scrollWidth > tw.clientWidth + 4 && !tw.nextElementSibling?.classList?.contains('scrollhint')) { const d = document.createElement('div'); d.className = 'scrollhint'; d.textContent = '← scroll sideways for more columns →'; tw.after(d); } });
   $$('table', root).forEach((table, ti) => {
     const thead = table.querySelector('thead'); const tbody = table.tBodies[0]; if (!thead || !tbody) return;
     const dataRows = Array.from(tbody.rows).filter(r => !r.classList.contains('total')); if (dataRows.length < 2) return;
@@ -1315,6 +1322,32 @@ function forecast(ym) {
   const act = summary(ym); const hasActual = act.tx.length > 0;
   return { ym, bm, accounts: out, income: tot('income'), extraIn: tot('extraIn'), fixed: tot('fixed'), bnpl: tot('bnpl'), extras: tot('extras'), goals: tot('goals'), drawsOut: r2(dr.reduce((x, d) => x + d.amount, 0)), surplus, budgets, budgetTotal, remaining: r2(surplus - budgetTotal), baseVarCat, base, act, hasActual };
 }
+function cashflow(ym, fc) {
+  const pl = planFor(ym); const daysIn = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
+  const ev = [];
+  for (const o of fc.accounts) {
+    if (o.income) ev.push({ day: o.a.id === 'thinc' ? (state.settings.incomeThincDay || 4) : o.a.id === 'oneholidays' ? (state.settings.incomeOneDay || 16) : 1, acc: o.a.id, label: o.a.id === 'thinc' ? 'ORN income' : o.a.id === 'oneholidays' ? 'Itravelmix income' : 'Income', amt: o.income, kind: 'income' });
+    for (const r of o.fixedRows) ev.push({ day: Math.min(daysIn, r.day || 1), acc: o.a.id, label: r.payee, amt: -r.planAmt, kind: r.type });
+    if (o.bnpl) ev.push({ day: 1, acc: o.a.id, label: 'Zilch / Clearpay estimate (spread)', amt: -o.bnpl, kind: 'estimate', spread: true });
+  }
+  for (const d of draws()) { ev.push({ day: d.day || 4, acc: d.from, label: d.label, amt: -d.amount, kind: 'Pay ourselves' }); ev.push({ day: d.day || 4, acc: d.to, label: d.label, amt: d.amount, kind: 'Pay ourselves' }); }
+  for (const e of pl.extras) ev.push({ day: e.day || 1, acc: e.acc, label: e.payee, amt: e.kind === 'income' ? e.amount : -e.amount, kind: 'extra' });
+  for (const g of goalMonthly()) if (g.monthly) { const goal = state.goals.find(x => x.id === g.id); ev.push({ day: 25, acc: g.acc, label: 'Savings: ' + (goal ? goal.name : ''), amt: -g.monthly, kind: 'savings' }); }
+  // spread BNPL estimate evenly across the month
+  const out = [];
+  for (const e of ev) { if (e.spread) { const per = r2(e.amt / daysIn); for (let d = 1; d <= daysIn; d++) out.push(Object.assign({}, e, { day: d, amt: per, hidden: true })); } else out.push(e); }
+  out.sort((a, b) => a.day - b.day || b.amt - a.amt);
+  const accs = fc.accounts.map(o => o.a.id); const bal = {}; for (const o of fc.accounts) bal[o.a.id] = o.opening;
+  const days = []; let low = {}; for (const id of accs) low[id] = { bal: bal[id], day: 0 };
+  for (let d = 1; d <= daysIn; d++) {
+    const todays = out.filter(e => e.day === d);
+    for (const e of todays) bal[e.acc] = r2((bal[e.acc] || 0) + e.amt);
+    for (const id of accs) if (bal[id] < low[id].bal) low[id] = { bal: bal[id], day: d };
+    const vis = todays.filter(e => !e.hidden); const bn = r2(todays.filter(e => e.hidden).reduce((x, e) => x + e.amt, 0));
+    days.push({ day: d, events: vis, bnpl: bn, bal: Object.assign({}, bal), total: r2(Object.values(bal).reduce((x, v) => x + v, 0)) });
+  }
+  return { days, low, daysIn, accs };
+}
 function renderPlan(main) {
   const ms = months(); const bm = baseMonth();
   const cur = todayISO().slice(0, 7); const future = [0, 1, 2, 3].map(n => addMonths(cur, n));
@@ -1359,6 +1392,14 @@ function renderPlan(main) {
       ${fc.accounts.map(o => `<tr data-acc="${o.a.id}"><td><span class="payee">${esc(o.a.name)}</span>${o.a.balanceOnly ? '<div class="ref">balance from Settings</div>' : ''}</td><td class="num"><input class="f opening" type="number" step="0.01" value="${o.opening}"></td><td class="num"><input class="f income" type="number" step="0.01" value="${o.income}"></td><td class="num pos">${o.tIn ? gbp(o.tIn) : '—'}</td><td class="num">${o.tOut ? gbp(o.tOut) : '—'}</td><td class="num">${gbp(o.fixed)}</td><td class="num"><input class="f bnpl" type="number" step="0.01" value="${o.bnpl}"></td><td class="num">${o.goals ? gbp(o.goals) : '—'}</td><td class="num">${o.extras || o.extraIn ? gbp(r2(o.extraIn - o.extras), { sign: true }) : '—'}</td><td class="num ${o.surplus < 0 ? 'neg' : 'pos'}">${gbp(o.surplus, { sign: true })}</td><td class="num ${o.end < 0 ? 'neg' : 'pos'}"><b>${gbp(o.end)}</b></td></tr>`).join('')}
       <tr class="total"><td>Household</td><td></td><td class="num">${gbp(fc.income)}</td><td></td><td></td><td class="num">${gbp(fc.fixed)}</td><td class="num">${gbp(fc.bnpl)}</td><td class="num">${gbp(fc.goals)}</td><td class="num">${gbp(r2(fc.extraIn - fc.extras), { sign: true })}</td><td class="num ${fc.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.surplus, { sign: true })}</td><td></td></tr>
     </tbody></table></div><div class="help">A negative surplus on one account with a positive one elsewhere means a payment should be switched: use Paid from on the DD &amp; SO page or Action → Switch on the Review page. Credit cards appear through their minimum payments only.</div></div>
+    <div class="card"><div class="cardhead"><h2>Cash flow · ${monthLabel(ym)}</h2><label class="small muted">Account <select id="cfAcc"><option value="all">Household (all accounts)</option>${fc.accounts.map(o => `<option value="${o.a.id}" ${view.cfAcc === o.a.id ? 'selected' : ''}>${o.a.name}</option>`).join('')}</select></label></div>
+      ${(() => { const cf = cashflow(ym, fc); const sel = view.cfAcc && view.cfAcc !== 'all' ? view.cfAcc : null; const lows = fc.accounts.filter(o => cf.low[o.a.id].bal < 0).map(o => `${o.a.name} dips to ${gbp(cf.low[o.a.id].bal)} on the ${ordinal(cf.low[o.a.id].day)}`); return `
+      <div class="help">${lows.length ? `<b>Watch:</b> ${lows.join('; ')}. Move a payment date or switch the account it is paid from.` : 'No account goes below zero on the planned dates.'} Zilch/Clearpay is spread evenly over the month; income lands on the days set in Settings.</div>
+      <div class="chartbox" style="height:220px"><canvas id="chCash"></canvas></div>
+      <div class="tw" style="max-height:480px;overflow-y:auto"><table id="cfTable"><thead><tr><th>Day</th><th>Payment</th><th>Account</th><th class="num">Amount</th><th class="num">${sel ? esc(accName(sel)) + ' balance' : 'Household balance'}</th></tr></thead><tbody>
+        ${cf.days.filter(d => d.events.some(e => !sel || e.acc === sel)).map(d => { const evs = d.events.filter(e => !sel || e.acc === sel); return evs.map((e, i) => `<tr><td class="num">${i === 0 ? ordinal(d.day) : ''}</td><td>${esc(e.label)}<span class="ref"> · ${esc(e.kind)}</span></td><td class="small">${esc(accName(e.acc))}</td><td class="num ${e.amt > 0 ? 'pos' : ''}">${gbp(e.amt, { sign: true })}</td><td class="num ${(sel ? d.bal[sel] : d.total) < 0 ? 'neg' : ''}">${i === evs.length - 1 ? '<b>' + gbp(sel ? d.bal[sel] : d.total) + '</b>' : ''}</td></tr>`).join(''); }).join('')}
+      </tbody></table></div>`; })()}
+    </div>
     <div class="grid g2">
       <div class="card"><div class="cardhead"><h3>Set payments next month, by account</h3></div>${fc.accounts.filter(o => o.fixedRows.length).map(o => `<details><summary>${esc(o.a.name)} <span class="num muted small">${gbp(o.fixed)} · ${o.fixedRows.length}</span></summary><div class="tw"><table><tbody>${o.fixedRows.map(r => `<tr><td class="num muted">${ordinal(r.day)}</td><td>${esc(r.payee)}</td><td class="small muted">${r.type}</td><td class="num">${gbp(r.planAmt)}</td></tr>`).join('')}</tbody></table></div></details>`).join('')}</div>
       <div class="card"><div class="cardhead"><h3>Planned extras for ${monthLabel(ym)}</h3></div><div class="help">Known one-offs, in or out: car sale, backdated VAT, school fees, car service, holiday deposits.</div>
@@ -1369,6 +1410,7 @@ function renderPlan(main) {
     <div class="card"><div class="cardhead"><h2>Month by month</h2><span class="small muted">actual to date, then forecast (set payments + estimates)</span></div><div class="chartbox"><canvas id="chPlan"></canvas></div></div>
   </div>`;
   $('#planMonth').onchange = e => { view.planMonth = e.target.value; render(); };
+  $('#cfAcc').onchange = e => { view.cfAcc = e.target.value; render(); };
   $('#planBase').onchange = e => { state.plan.base = e.target.value; persist(); render(); };
   $$('#planTable tr[data-acc]').forEach(tr => { const acc = tr.dataset.acc; $$('input.f', tr).forEach(inp => inp.onchange = () => { const k = inp.classList.contains('opening') ? 'opening' : inp.classList.contains('income') ? 'income' : 'bnpl'; pl[k][acc] = +inp.value || 0; persist(); render(); }); });
   $('#extraForm').onsubmit = e => { e.preventDefault(); pl.extras.push({ payee: $('#xPayee').value.trim(), amount: +$('#xAmount').value || 0, acc: $('#xAcc').value, day: +$('#xDay').value || null, kind: $('#xKind').value }); persist(); render(); };
@@ -1378,6 +1420,9 @@ function renderPlan(main) {
   $('#bSuggest').onclick = () => { for (const c of OPTIONAL_CATS.concat(['Food & Groceries', 'Car & Fuel', 'Kids & School', 'Travel & Parking'])) { const v = fc.baseVarCat[c]; if (v && pl.budgets[c] == null) pl.budgets[c] = Math.round(v); } persist(); render(); toast('Budgets suggested – edit the amounts'); };
   $$('#budgetTable tr[data-cat]').forEach(tr => { const c = tr.dataset.cat; $('input.bamt', tr).onchange = e => { pl.budgets[c] = +e.target.value || 0; persist(); render(); }; $('button.brm', tr).onclick = () => { delete pl.budgets[c]; persist(); render(); }; });
   if (typeof Chart === 'undefined') return;
+  { const cf = cashflow(ym, fc); const sel = view.cfAcc && view.cfAcc !== 'all' ? view.cfAcc : null; const series = sel ? [{ id: sel, name: accName(sel) }] : fc.accounts.filter(o => o.a.type !== 'savings').map(o => ({ id: o.a.id, name: o.a.name }));
+    const cols = ['--c1', '--c2', '--c3', '--c4', '--c6', '--c7', '--c9'];
+    charts.cash = new Chart($('#chCash'), { type: 'line', data: { labels: cf.days.map(d => d.day), datasets: series.map((sr, i) => ({ label: sr.name, data: cf.days.map(d => d.bal[sr.id]), borderColor: css(cols[i % cols.length]), backgroundColor: 'transparent', tension: .2, pointRadius: 0, borderWidth: 2 })).concat(sel ? [] : [{ label: 'Household total', data: cf.days.map(d => d.total), borderColor: css('--fg'), borderDash: [4, 4], backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5 }]) }, options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { ticks: { callback: v => '£' + (v / 1000).toFixed(1) + 'k' }, grid: { color: css('--line') } }, x: { title: { display: true, text: 'day of month' }, grid: { display: false } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${gbp(c.parsed.y)}` } } } } }); }
   const fut = future.filter(m => !ms.includes(m)); const labels = ms.concat(fut); const act = ms.map(m => summary(m)); const fcs = fut.map(m => forecast(m));
   charts.plan = new Chart($('#chPlan'), { type: 'bar', data: { labels: labels.map(m => monthLabel(m).slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: act.map(a => a.income + a.incomeOne).concat(fcs.map(f => r2(f.income + f.extraIn))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c1') : css('--c1') + '80'), borderRadius: 4 }, { label: 'Outgoings', data: act.map(a => a.out).concat(fcs.map(f => r2(f.fixed + f.bnpl + f.extras + f.goals + f.budgetTotal))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c2') : css('--c2') + '80'), borderRadius: 4 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '£' + (v / 1000) + 'k' }, grid: { color: css('--line') } }, x: { grid: { display: false } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${gbp(c.parsed.y)}` } } } } });
 }
@@ -1561,9 +1606,9 @@ function renderReview(main) {
     <div class="chips" id="rvBank"><button class="chip ${f.bank === 'all' ? 'on' : ''}" data-bank="all">All (${all.length})</button><button class="chip ${f.bank === 'DD' ? 'on' : ''}" data-bank="DD">Direct debits (${cnt('DD')})</button><button class="chip ${f.bank === 'SO' ? 'on' : ''}" data-bank="SO">Standing orders (${cnt('SO')})</button><button class="chip ${f.bank === 'Transfer' ? 'on' : ''}" data-bank="Transfer">Bank transfers (${cnt('Transfer')})</button><button class="chip ${f.bank === 'Card' ? 'on' : ''}" data-bank="Card">Card payments (${cnt('Card')})</button><button class="chip ${f.bank === 'BNPL' ? 'on' : ''}" data-bank="BNPL">Zilch / Clearpay (${cnt('BNPL')})</button></div>
     <div class="chips" id="rvType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">Any type</button>${TYPES.map(x => `<button class="chip ${f.type === x[0] ? 'on' : ''}" data-type="${x[0]}">${x[1]} (${tcount(x[0])})</button>`).join('')}</div>
     <div class="chips" id="rvAcc"><button class="chip ${f.acc === 'all' ? 'on' : ''}" data-acc="all">All accounts</button>${allAccounts().filter(a => a.type !== 'manual').map(a => `<button class="chip ${f.acc === a.id ? 'on' : ''}" data-acc="${a.id}">${a.name}</button>`).join('')}</div>
-    <div class="card"><div class="tw"><table id="rvTable"><thead><tr><th>Payee</th><th>Account</th><th>Bank</th><th class="num">Latest</th><th class="num">Months</th><th class="num">Avg / month</th><th>Type</th><th>In plan</th><th>Category</th><th>Need</th><th>Work exp.</th><th>Action</th><th>Note</th></tr></thead><tbody>
-      ${rows.map(r => `<tr data-key="${esc(r.key)}"><td><span class="payee">${esc(r.payee)}</span><div class="ref">${r.n} transaction${r.n > 1 ? 's' : ''} · last ${shortDate(r.last.d)}</div></td><td class="small">${esc(accName(r.acc))}</td><td><span class="pill ${r.bank === 'DD' || r.bank === 'SO' ? 'n' : r.bank === 'BNPL' ? 'warn' : 'good'}">${r.bank}</span></td><td class="num" data-v="${r.latest}"><b>${gbp(r.latest)}</b></td><td class="num">${r.monthsN}</td><td class="num" data-v="${r.avg}">${gbp(r.avg)}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === r.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td data-v="${r.inPlan ? 'yes' : 'no'}">${r.inPlan ? '<span class="pill good">Yes</span>' : r.action ? `<span class="pill bad">${r.action.kind === 'cancel' ? 'Cancelled' : 'Switch'}</span>` : '<span class="pill">No</span>'}</td><td>${catSelect('cat', r.cat)}</td><td><select class="ess"><option value="1" ${r.ess ? 'selected' : ''}>Essential</option><option value="0" ${r.ess ? '' : 'selected'}>Optional</option></select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${r.exp ? 'checked' : ''}> <select class="from" ${r.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === r.from ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td><select class="act"><option value="">${r.action ? '✓ ' + (r.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(r.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${r.action ? '<option value="clear">Undo action</option>' : ''}</select></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td></tr>`).join('')}
-      <tr class="total"><td colspan="3">Shown (${rows.length})</td><td class="num">${gbp(r2(rows.reduce((x, r) => x + r.latest, 0)))}</td><td colspan="9"></td></tr>
+    <div class="card"><div class="tw"><table id="rvTable"><thead><tr><th>Payee</th><th>Account</th><th>Bank</th><th class="num">Latest</th><th class="num">Mths</th><th>Type</th><th>Plan</th><th>Category</th><th>Need</th><th>Exp.</th><th>Action</th><th>Note</th></tr></thead><tbody>
+      ${rows.map(r => `<tr data-key="${esc(r.key)}"><td><span class="payee">${esc(r.payee)}</span><div class="ref">${r.n} transaction${r.n > 1 ? 's' : ''} · last ${shortDate(r.last.d)}</div></td><td class="small">${esc(accName(r.acc))}</td><td><span class="pill ${r.bank === 'DD' || r.bank === 'SO' ? 'n' : r.bank === 'BNPL' ? 'warn' : 'good'}">${r.bank}</span></td><td class="num" data-v="${r.latest}"><b>${gbp(r.latest)}</b>${r.avg !== r.latest ? `<div class="ref">avg ${gbp(r.avg)}</div>` : ''}</td><td class="num">${r.monthsN}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === r.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td data-v="${r.inPlan ? 'yes' : 'no'}">${r.inPlan ? '<span class="pill good">Yes</span>' : r.action ? `<span class="pill bad">${r.action.kind === 'cancel' ? 'Cancelled' : 'Switch'}</span>` : '<span class="pill">No</span>'}</td><td>${catSelect('cat', r.cat)}</td><td><select class="ess"><option value="1" ${r.ess ? 'selected' : ''}>Essential</option><option value="0" ${r.ess ? '' : 'selected'}>Optional</option></select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${r.exp ? 'checked' : ''}> <select class="from" ${r.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === r.from ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td><select class="act"><option value="">${r.action ? '✓ ' + (r.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(r.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${r.action ? '<option value="clear">Undo action</option>' : ''}</select></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td></tr>`).join('')}
+      <tr class="total"><td colspan="3">Shown (${rows.length})</td><td class="num">${gbp(r2(rows.reduce((x, r) => x + r.latest, 0)))}</td><td colspan="8"></td></tr>
     </tbody></table></div></div>
   </div>`;
   $$('#rvBank .chip').forEach(b => b.onclick = () => { f.bank = b.dataset.bank; render(); });
@@ -1591,6 +1636,8 @@ function renderSettings(main) {
         <div class="grid" style="gap:8px;margin-top:8px">
           <label class="small muted">Expected income into Thinc Business (ORN) £ <input type="number" id="sThinc" value="${s.incomeThinc}"></label>
           <label class="small muted">Expected income into One Holidays (Itravelmix, inc VAT) £ <input type="number" id="sOne" value="${s.incomeOneHolidays}"></label>
+          <label class="small muted">Day ORN income lands (Thinc) <input type="number" id="sThincDay" min="1" max="31" value="${s.incomeThincDay || 4}"></label>
+          <label class="small muted">Day Itravelmix income lands (One Holidays) <input type="number" id="sOneDay" min="1" max="31" value="${s.incomeOneDay || 16}"></label>
           <label class="small muted">Rent to Thinc Digital £ <input type="number" id="sRent" value="${s.rent}"></label>
           <label class="small muted">VAT to set aside each month (One Holidays) £ <input type="number" id="sVat" value="${s.vat}"></label>
           <label class="small muted">Virgin Savings balance £ <input type="number" id="sSav" value="${s.savingsBalance || 0}"></label>
@@ -1624,7 +1671,7 @@ function renderSettings(main) {
       </div>
     </div>
   </div>`;
-  $('#saveSettings').onclick = () => { s.incomeThinc = +$('#sThinc').value || 0; s.incomeOneHolidays = +$('#sOne').value || 0; s.rent = +$('#sRent').value || 0; s.vat = +$('#sVat').value || 0; s.savingsBalance = +$('#sSav').value || 0; s.startMonth = $('#sStart').value.trim() || '2026-09'; persist(); toast('Settings saved'); };
+  $('#saveSettings').onclick = () => { s.incomeThinc = +$('#sThinc').value || 0; s.incomeOneHolidays = +$('#sOne').value || 0; s.rent = +$('#sRent').value || 0; s.incomeThincDay = +$('#sThincDay').value || 4; s.incomeOneDay = +$('#sOneDay').value || 16; s.vat = +$('#sVat').value || 0; s.savingsBalance = +$('#sSav').value || 0; s.startMonth = $('#sStart').value.trim() || '2026-09'; persist(); toast('Settings saved'); };
   $('#savePin').onclick = () => { const p = $('#newPin').value.trim(); if (!/^\d{4,8}$/.test(p)) return toast('PIN must be 4 to 8 digits'); s.pin = p; persist(); $('#newPin').value = ''; toast('PIN changed'); };
   $$('[data-draw]').forEach(tr => { const d = s.draws.find(x => x.id === tr.dataset.draw); $('input.damt', tr).onchange = e => { d.amount = +e.target.value || 0; persist(); }; $('input.don', tr).onchange = e => { d.on = e.target.checked; persist(); }; $('button.ddel', tr).onclick = () => { s.draws = s.draws.filter(x => x.id !== d.id); persist(); render(); }; });
   $('#drawForm').onsubmit = e => { e.preventDefault(); s.draws.push({ id: 'd' + Date.now().toString(36), label: $('#dLabel').value.trim(), from: $('#dFrom').value, to: $('#dTo').value, amount: +$('#dAmt').value || 0, day: +$('#dDay').value || 4 }); persist(); render(); toast('Added'); };
