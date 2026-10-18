@@ -714,7 +714,7 @@ function ruleFor(tx) {
 
 /* ---------------- state ---------------- */
 const SEED = JSON.parse($('#seedData').textContent);
-const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
+const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, draws: [{ id: 'd1', label: 'Salary – Ajay', from: 'thinc', to: 'ajay_hsbc', amount: 1047.5, day: 4 }, { id: 'd2', label: 'Salary – Louise', from: 'thinc', to: 'louise_hsbc', amount: 1047.5, day: 4 }, { id: 'd3', label: 'Dividend – Ajay', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }, { id: 'd4', label: 'Dividend – Louise', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }], claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
 const OPTIONAL_CATS = ['Beauty & Health', 'Clothing & Shopping', 'Eating Out & Takeaway', 'Lunch & Coffee', 'Entertainment', 'TV & Subscriptions', 'Gifts & Charity', 'Cash & Other'];
 const TYPES = [['regular', 'Regular'], ['everyday', 'Everyday'], ['oneoff', 'One-off'], ['unexpected', 'Unexpected']];
 let state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], customCats: [], plan: {}, settings: Object.assign({}, DEFAULT_SETTINGS), updatedAt: 0 };
@@ -725,7 +725,7 @@ function loadLocal() {
   try { const s = JSON.parse(localStorage.getItem('kawa.state') || 'null'); if (s && s.v === 1) state = Object.assign(state, s, { settings: Object.assign({}, DEFAULT_SETTINGS, s.settings || {}) }); } catch (e) { }
   try { session = JSON.parse(localStorage.getItem('kawa.session') || '{"user":null}'); } catch (e) { }
 }
-function ensureState() { state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); }
+function ensureState() { state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); if (!state.settings.draws) state.settings.draws = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.draws)); }
 function saveLocal() { try { localStorage.setItem('kawa.state', JSON.stringify(state)); } catch (e) { } }
 function persist() {
   state.updatedAt = Date.now();
@@ -828,7 +828,7 @@ function summary(ym) {
 }
 /* fixed cost register: one row per recurring payee */
 function fixedRegister() {
-  const tx = allTx().filter(t => t.recurring && t.v < 0 && t.group !== 'transfer');
+  const tx = allTx().filter(t => t.recurring && t.v < 0 && t.group !== 'transfer' && t.group !== 'bnpl');
   const byKey = {};
   for (const t of tx) { const k = t.a + '|' + t.pk; (byKey[k] = byKey[k] || { key: k, pk: t.pk, acc: t.a, payee: t.p, cat: t.cat, kind: t.k, months: {}, last: null, note: t.note }); const b = byKey[k]; b.months[t.m] = r2((b.months[t.m] || 0) - t.v); if (!b.last || t.d > b.last.d) b.last = t; }
   const rows = Object.values(byKey).map(b => { const ms = Object.keys(b.months).sort(); const latest = ms[ms.length - 1]; return Object.assign(b, { day: dayOf(b.last.d), amount: b.months[latest], latestMonth: latest, confirmed: ms.length >= 2 || b.kind === 'DD' || b.kind === 'SO', kindLabel: b.kind === 'DD' ? 'Direct Debit' : b.kind === 'SO' ? 'Standing Order' : (b.kind === 'card' ? 'Card / subscription' : b.kind === 'payment' ? 'Bank transfer' : b.kind === 'fee' ? 'Fee' : 'Regular') }); });
@@ -870,6 +870,7 @@ const charts = {};
 const NAV = [
   ['home', 'Home', 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'],
   ['accounts', 'Accounts', 'M3 6h18v12H3zM3 10h18M7 14h4'],
+  ['review', 'Review', 'M4 6h16M4 12h16M4 18h10M18 16l2 2 4-4'],
   ['set', 'DD & SO', 'M3 7h18M3 12h18M3 17h18M7 7v10'],
   ['plan', 'Planner', 'M4 19V5m0 14h16M8 15l4-5 3 3 5-7'],
   ['actions', 'Actions', 'M5 13l4 4L19 7'],
@@ -920,7 +921,7 @@ function render() {
   const ms = months(); if (!view.month || !ms.includes(view.month)) view.month = ms.includes(state.settings.startMonth) ? state.settings.startMonth : ms[ms.length - 1];
   destroyCharts(); chartDefaults();
   const main = $('#main');
-  ({ home: renderHome, accounts: renderAccounts, fixed: renderFixed, set: renderSet, plan: renderPlan, actions: renderActions, savings: renderSavings, tx: renderTx, exp: renderExpenses, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
+  ({ home: renderHome, accounts: renderAccounts, fixed: renderFixed, review: renderReview, set: renderSet, plan: renderPlan, actions: renderActions, savings: renderSavings, tx: renderTx, exp: renderExpenses, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
   enhanceTables(main);
   $('#whoName').textContent = session.user || '';
 }
@@ -1246,10 +1247,7 @@ function addMonths(ym, n) { let r = ym; for (let i = 0; i < n; i++) r = nextMont
 function setPayments() {
   const bm = baseMonth();
   const rows = fixedRegister().map(r => Object.assign({}, r, { type: r.kind === 'DD' ? 'DD' : r.kind === 'SO' ? 'SO' : r.virtual ? 'Set-aside' : 'Subscription', from: r.acc, to: null }));
-  const tr = allTx().filter(t => (t.cat === 'Pay to ourselves' || t.cat === 'Transfer (internal)') && t.v < 0 && t.m === bm && destAccount(t) && destAccount(t) !== t.a);
-  const g = {};
-  for (const t of tr) { const to = destAccount(t); const k = `transfer|${t.a}|${to}`; (g[k] = g[k] || { key: k, pk: t.pk, acc: t.a, from: t.a, to, payee: `${accName(t.a)} → ${accName(to)}`, cat: t.cat, kind: 'payment', type: 'Transfer', months: {}, day: dayOf(t.d), amount: 0, kindLabel: t.cat, note: state.payeeNote[k] || '', confirmed: true }); g[k].amount = r2(g[k].amount - t.v); g[k].months[bm] = g[k].amount; if (dayOf(t.d) < g[k].day) g[k].day = dayOf(t.d); }
-  rows.push(...Object.values(g));
+  for (const d of draws()) rows.push({ key: 'draw|' + d.id, pk: 'DRAW ' + d.id, acc: d.from, from: d.from, to: d.to, payee: d.label, cat: 'Pay to ourselves', kind: 'payment', type: 'Transfer', months: {}, day: d.day || 4, amount: d.amount, kindLabel: 'Pay ourselves', note: 'Set in Settings → Pay ourselves', confirmed: true, locked: true });
   for (const a of allAccounts().filter(x => x.type === 'credit')) { const cov = SEED.coverage.filter(c => c.account === a.id); const latest = cov[cov.length - 1]; const min = latest && latest.summary.minPayment ? latest.summary.minPayment : 0; if (min) rows.push({ key: 'card|' + a.id, pk: 'CARD ' + a.id, acc: 'thinc', from: 'thinc', to: a.id, payee: a.name + ' minimum payment', cat: 'Credit Card Payment', kind: 'payment', type: 'Card payment', months: {}, day: a.id === 'capitalone' ? 21 : 15, amount: min, kindLabel: 'Card payment', confirmed: true, note: state.payeeNote['CARD ' + a.id] || (latest.summary.dueDate ? 'Due ' + latest.summary.dueDate : '') }); }
   for (const r of rows) { const act = (state.actions || []).find(x => x.key === r.key); r.action = act || null; r.planAcc = act && act.kind === 'switch' ? act.to : ((state.plan.moves || {})[r.key] || r.from); r.planAmt = (state.plan.amt || {})[r.key] != null ? state.plan.amt[r.key] : r.amount; const sk = (state.plan.skip || {})[r.key]; r.skip = act && act.kind === 'cancel' ? true : (sk != null ? !!sk : !r.confirmed); }
   return rows.filter(r => !(state.plan.hidden || {})[r.key]).sort((a, b) => a.day - b.day || b.amount - a.amount);
@@ -1266,7 +1264,7 @@ function renderSet(main) {
     <div class="chips" id="setType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">All types</button>${types.map(t => `<button class="chip ${f.type === t ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
     <div class="grid g4 tiles">${perAcc.map(x => `<div class="tile"><div class="lbl">${esc(x.a.name)}</div><div class="val num">${gbp(x.plan)}</div><div class="sub">${x.plan !== x.cur ? `now ${gbp(x.cur)} → planned ${gbp(x.plan)}` : 'per month, no changes planned'}</div></div>`).join('')}</div>
     <div class="card"><div class="tw"><table id="setTable"><thead><tr><th>Day</th><th>Payee</th><th>Type</th><th>Category</th><th class="num">Amount</th><th>Paid from (planned)</th><th>Next month?</th><th>Note</th><th></th></tr></thead><tbody>
-      ${shown.map(r => `<tr data-key="${esc(r.key)}" data-pk="${esc(r.pk)}" style="${r.skip ? 'opacity:.5' : ''}"><td class="num">${ordinal(r.day)}</td><td><span class="payee">${esc(r.payee)}</span>${r.to && r.type === 'Transfer' ? '' : `<div class="ref">${esc(accName(r.from))}${r.planAcc !== r.from ? ' → moving to ' + esc(accName(r.planAcc)) : ''}${r.action && r.action.kind === 'cancel' ? ' · <b>cancelled</b>' : ''}</div>`}</td><td class="small muted">${r.type}${r.confirmed ? '' : '<div class="ref">seen once – tick if it is monthly</div>'}</td><td><i class="dot" style="background:${catColor(r.cat)}"></i>${esc(r.cat)}</td><td class="num"><input class="amt" type="number" step="0.01" value="${r.planAmt}" style="width:95px;text-align:right"></td><td><select class="from">${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}" ${a.id === r.planAcc ? 'selected' : ''}>${a.name}</option>`).join('')}</select></td><td><input class="skip" type="checkbox" ${r.skip ? '' : 'checked'} title="Tick if this will be paid next month"></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td><td><button class="btn sm danger rm" title="Remove from set payments (it stays in Transactions as a one-off)">Remove</button></td></tr>`).join('')}
+      ${shown.map(r => `<tr data-key="${esc(r.key)}" data-pk="${esc(r.pk)}" style="${r.skip ? 'opacity:.5' : ''}"><td class="num">${ordinal(r.day)}</td><td><span class="payee">${esc(r.payee)}</span>${r.to && r.type === 'Transfer' ? '' : `<div class="ref">${esc(accName(r.from))}${r.planAcc !== r.from ? ' → moving to ' + esc(accName(r.planAcc)) : ''}${r.action && r.action.kind === 'cancel' ? ' · <b>cancelled</b>' : ''}</div>`}</td><td class="small muted">${r.type}${r.confirmed ? '' : '<div class="ref">seen once – tick if it is monthly</div>'}</td><td><i class="dot" style="background:${catColor(r.cat)}"></i>${esc(r.cat)}</td><td class="num"><input class="amt" type="number" step="0.01" value="${r.planAmt}" style="width:95px;text-align:right"></td><td>${r.locked ? '<span class="small muted">Settings → Pay ourselves</span>' : `<select class="from">${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}" ${a.id === r.planAcc ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`}</td><td><input class="skip" type="checkbox" ${r.skip ? '' : 'checked'} title="Tick if this will be paid next month"></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td><td>${r.locked ? '' : '<button class="btn sm danger rm" title="Remove from set payments (it stays in Transactions as a one-off)">Remove</button>'}</td></tr>`).join('')}
       <tr class="total"><td colspan="4">Total shown</td><td class="num">${gbp(r2(shown.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))}</td><td colspan="4"></td></tr>
     </tbody></table></div></div>
   </div>`;
@@ -1276,83 +1274,112 @@ function renderSet(main) {
   $$('#setType .chip').forEach(b => b.onclick = () => { f.type = b.dataset.type; render(); });
   $$('#setTable tr[data-key]').forEach(tr => {
     const key = tr.dataset.key, pk = tr.dataset.pk;
-    $('select.from', tr).onchange = e => { const r = rows.find(x => x.key === key); if (e.target.value === r.from) { state.actions = state.actions.filter(x => x.key !== key); delete (state.plan.moves || {})[key]; persist(); render(); } else upsertAction({ kind: 'switch', key, pk, acc: r.from, to: e.target.value, payee: r.payee, amount: r.planAmt }); render(); };
+    const fromSel = $('select.from', tr); if (fromSel) fromSel.onchange = e => { const r = rows.find(x => x.key === key); if (e.target.value === r.from) { state.actions = state.actions.filter(x => x.key !== key); delete (state.plan.moves || {})[key]; persist(); render(); } else upsertAction({ kind: 'switch', key, pk, acc: r.from, to: e.target.value, payee: r.payee, amount: r.planAmt }); render(); };
     $('input.amt', tr).onchange = e => { state.plan.amt = state.plan.amt || {}; state.plan.amt[key] = +e.target.value || 0; persist(); render(); };
     $('input.skip', tr).onchange = e => { const r = rows.find(x => x.key === key); state.plan.skip = state.plan.skip || {}; state.plan.skip[key] = !e.target.checked; if (!e.target.checked && r.confirmed) upsertAction({ kind: 'cancel', key, pk, acc: r.from, payee: r.payee, amount: r.planAmt }); else state.actions = state.actions.filter(x => !(x.key === key && x.kind === 'cancel')); persist(); render(); };
     $('input.note', tr).onchange = e => { state.payeeNote[pk] = e.target.value; persist(); toast('Note saved'); };
-    $('button.rm', tr).onclick = () => { state.plan.hidden = state.plan.hidden || {}; state.plan.hidden[key] = true; if (!/^(transfer|card|virtual)\|/.test(key)) { state.notRecurring[pk] = true; state.payeeType = state.payeeType || {}; state.payeeType[pk] = 'oneoff'; } persist(); render(); toast('Removed from set payments'); };
+    const rmBtn = $('button.rm', tr); if (rmBtn) rmBtn.onclick = () => { state.plan.hidden = state.plan.hidden || {}; state.plan.hidden[key] = true; if (!/^(transfer|card|virtual)\|/.test(key)) { state.notRecurring[pk] = true; state.payeeType = state.payeeType || {}; state.payeeType[pk] = 'oneoff'; } persist(); render(); toast('Removed from set payments'); };
   });
 }
 /* forecast for a future month */
 function planFor(ym) { state.plan.months = state.plan.months || {}; if (!state.plan.months[ym]) { state.plan.months[ym] = { income: {}, allow: {}, bnpl: {}, opening: {}, extras: [] }; if (ym === '2026-11') state.plan.months[ym].extras.push({ payee: "Sale of Louise's car (expected)", amount: 8000, acc: 'virgin_savings', kind: 'income', day: null }, { payee: 'Backdated VAT bill (approx.)', amount: 6500, acc: 'virgin_savings', kind: 'cost', day: null }); } return state.plan.months[ym]; }
+function draws() { return (state.settings.draws || []).filter(d => d.on !== false); }
 function forecast(ym) {
-  const pl = planFor(ym); const bm = baseMonth(); const base = summary(bm); const rows = setPayments().filter(r => !r.skip);
+  const pl = planFor(ym); const bm = baseMonth(); const base = summary(bm);
+  const rows = setPayments().filter(r => !r.skip && r.type !== 'Transfer');
   const accs = allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit');
-  const baseVar = {}, baseBnpl = {};
-  for (const t of base.tx) { if (t.v < 0 && t.group !== 'transfer') { if (t.group === 'bnpl') baseBnpl[t.a] = r2((baseBnpl[t.a] || 0) - t.v); else if (!t.recurring && !t.oneoff && t.group !== 'income') baseVar[t.a] = r2((baseVar[t.a] || 0) - t.v); } }
+  const baseBnpl = {}; for (const t of base.tx) if (t.v < 0 && t.group === 'bnpl') baseBnpl[t.a] = r2((baseBnpl[t.a] || 0) - t.v);
+  const baseVarCat = {}; for (const t of base.tx) if (t.v < 0 && t.group !== 'transfer' && t.group !== 'income' && t.group !== 'bnpl' && !t.recurring) baseVarCat[t.cat] = r2((baseVarCat[t.cat] || 0) - t.v);
+  const dr = draws();
   const out = accs.map(a => {
     const defIncome = a.id === 'thinc' ? state.settings.incomeThinc : a.id === 'oneholidays' ? state.settings.incomeOneHolidays : 0;
     const income = pl.income[a.id] != null ? pl.income[a.id] : defIncome;
     const cov = SEED.coverage.filter(c => c.account === a.id); const latest = cov[cov.length - 1];
     const opening = pl.opening[a.id] != null ? pl.opening[a.id] : (a.id === 'virgin_savings' ? (state.settings.savingsBalance || 0) : (latest && latest.summary.closing != null ? latest.summary.closing : 0));
-    const fixedRows = rows.filter(r => r.planAcc === a.id && r.type !== 'Transfer');
+    const fixedRows = rows.filter(r => r.planAcc === a.id);
     const fixed = r2(fixedRows.reduce((x, r) => x + r.planAmt, 0));
-    const tOut = r2(rows.filter(r => r.type === 'Transfer' && r.planAcc === a.id).reduce((x, r) => x + r.planAmt, 0));
-    const tIn = r2(rows.filter(r => r.type === 'Transfer' && r.to === a.id).reduce((x, r) => x + r.planAmt, 0));
-    const allow = pl.allow[a.id] != null ? pl.allow[a.id] : (baseVar[a.id] || 0);
+    const tOut = r2(dr.filter(d => d.from === a.id).reduce((x, d) => x + d.amount, 0));
+    const tIn = r2(dr.filter(d => d.to === a.id).reduce((x, d) => x + d.amount, 0));
     const bnpl = pl.bnpl[a.id] != null ? pl.bnpl[a.id] : (baseBnpl[a.id] || 0);
     const extras = r2(pl.extras.filter(e => e.acc === a.id && e.kind !== 'income').reduce((x, e) => x + e.amount, 0));
     const extraIn = r2(pl.extras.filter(e => e.acc === a.id && e.kind === 'income').reduce((x, e) => x + e.amount, 0));
     const goals = r2(goalMonthly().filter(g => g.acc === a.id).reduce((x, g) => x + g.monthly, 0));
-    const end = r2(opening + income + extraIn + tIn - tOut - fixed - extras - goals);
-    const baseOpt = r2(-base.tx.filter(t => t.a === a.id && t.v < 0 && !t.ess && t.group !== 'transfer' && t.group !== 'income').reduce((x, t) => x + t.v, 0));
-    return { a, income, opening, fixed, fixedRows, tOut, tIn, allow, bnpl, extras, extraIn, goals, baseOpt, end, defIncome, defAllow: baseVar[a.id] || 0, defBnpl: baseBnpl[a.id] || 0 };
+    const surplus = r2(income + extraIn + tIn - tOut - fixed - bnpl - extras - goals);
+    return { a, income, opening, fixed, fixedRows, tOut, tIn, bnpl, extras, extraIn, goals, surplus, end: r2(opening + surplus), defIncome, defBnpl: baseBnpl[a.id] || 0 };
   });
   const tot = k => r2(out.reduce((x, o) => x + o[k], 0));
-  const budget = r2(tot('income') + tot('extraIn') - tot('fixed') - tot('extras') - tot('goals'));
-  return { ym, bm, accounts: out, income: tot('income'), extraIn: tot('extraIn'), fixed: tot('fixed'), allow: tot('allow'), bnpl: tot('bnpl'), extras: tot('extras'), goals: tot('goals'), baseOpt: tot('baseOpt'), budget, spare: r2(budget - tot('allow') - tot('bnpl')), base };
+  const budgets = Object.entries(pl.budgets || {}).map(([cat, amt]) => ({ cat, amt: +amt || 0 }));
+  const budgetTotal = r2(budgets.reduce((x, b) => x + b.amt, 0));
+  const surplus = r2(tot('income') + tot('extraIn') - tot('fixed') - tot('bnpl') - tot('extras') - tot('goals'));
+  // actuals for the forecast month, if statements cover it
+  const act = summary(ym); const hasActual = act.tx.length > 0;
+  return { ym, bm, accounts: out, income: tot('income'), extraIn: tot('extraIn'), fixed: tot('fixed'), bnpl: tot('bnpl'), extras: tot('extras'), goals: tot('goals'), drawsOut: r2(dr.reduce((x, d) => x + d.amount, 0)), surplus, budgets, budgetTotal, remaining: r2(surplus - budgetTotal), baseVarCat, base, act, hasActual };
 }
 function renderPlan(main) {
   const ms = months(); const bm = baseMonth();
-  const cur = todayISO().slice(0, 7); const future = [1, 2, 3].map(n => addMonths(cur, n));
-  if (!view.planMonth || !future.includes(view.planMonth)) view.planMonth = future[0];
+  const cur = todayISO().slice(0, 7); const future = [0, 1, 2, 3].map(n => addMonths(cur, n));
+  if (!view.planMonth || !future.includes(view.planMonth)) view.planMonth = future[1];
   const ym = view.planMonth; const fc = forecast(ym); const pl = planFor(ym);
+  const dr = state.settings.draws || [];
+  const today = new Date(); const inMonth = ym === cur; const daysIn = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(); const elapsed = inMonth ? Math.min(1, today.getDate() / daysIn) : (ym < cur ? 1 : 0);
+  const catOptions = allCats().filter(c => (catGroup(c) === 'variable' || catGroup(c) === 'fixed') && c !== 'To categorise' && c !== 'Work Expense');
   main.innerHTML = `<div class="section">
-    <div class="toolbar"><h1>Planner</h1><div class="spacer"></div><label class="small muted">Forecast for ${monthSelect('planMonth', ym, future)}</label><label class="small muted">based on ${monthSelect('planBase', bm, ms)}</label></div>
-    <div class="help">Income, regular set payments, planned extras and savings targets per account for ${monthLabel(ym)}. Ad-hoc, one-off and unexpected spending is deliberately left out, so the figure is the true budget. Cancellations and switches from the Actions page are applied. What last month's everyday spending would do to it is shown separately below.</div>
+    <div class="toolbar"><h1>Planner</h1><div class="spacer"></div><label class="small muted">Month ${monthSelect('planMonth', ym, future)}</label><label class="small muted">estimates from ${monthSelect('planBase', bm, ms)}</label></div>
+    <div class="help">Built only from what we know: fixed income, what we pay ourselves, direct debits, standing orders and payments marked Regular on the Review page, the Zilch/Clearpay estimate, savings targets and planned extras. Nothing ad hoc. The surplus is what is left to budget; set budgets below and track them as statements come in.</div>
     <div class="grid g4 tiles">
-      <div class="tile hero ${fc.budget < 0 ? 'neg' : ''}"><div class="lbl">${fc.budget < 0 ? 'Budget shortfall' : 'Budget for everyday spending'}</div><div class="val num">${gbp(fc.budget)}</div><div class="sub">income − set payments − planned extras − savings targets</div></div>
-      <div class="tile"><div class="lbl">Income expected</div><div class="val num">${gbp(r2(fc.income + fc.extraIn))}</div><div class="sub">regular ${gbp(fc.income, { dp: 0 })}${fc.extraIn ? ` + one-off ${gbp(fc.extraIn, { dp: 0 })}` : ''}</div></div>
-      <div class="tile"><div class="lbl">Set payments</div><div class="val num">${gbp(fc.fixed)}</div><div class="sub">regular only · ${(state.actions || []).length} action${(state.actions || []).length === 1 ? '' : 's'} applied</div></div>
-      <div class="tile"><div class="lbl">Savings targets</div><div class="val num">${gbp(fc.goals)}</div><div class="sub">monthly amount to stay on track</div></div>
+      <div class="tile hero ${fc.surplus < 0 ? 'neg' : ''}"><div class="lbl">Surplus before budgets</div><div class="val num">${gbp(fc.surplus)}</div><div class="sub">income − set payments − Zilch/Clearpay − savings − extras</div></div>
+      <div class="tile ${fc.remaining < 0 ? 'hero neg' : ''}"><div class="lbl">Left after budgets</div><div class="val num">${gbp(fc.remaining)}</div><div class="sub">budgets set ${gbp(fc.budgetTotal, { dp: 0 })}</div></div>
+      <div class="tile"><div class="lbl">Income</div><div class="val num">${gbp(r2(fc.income + fc.extraIn))}</div><div class="sub">fixed ${gbp(fc.income, { dp: 0 })}${fc.extraIn ? ` + one-off ${gbp(fc.extraIn, { dp: 0 })}` : ''}</div></div>
+      <div class="tile"><div class="lbl">Set payments</div><div class="val num">${gbp(fc.fixed)}</div><div class="sub">DDs, SOs, regulars, VAT, card minimums</div></div>
+      <div class="tile"><div class="lbl">Pay ourselves</div><div class="val num">${gbp(fc.drawsOut)}</div><div class="sub">salaries + dividends (stays in the household)</div></div>
+      <div class="tile"><div class="lbl">Zilch / Clearpay estimate</div><div class="val num">${gbp(fc.bnpl)}</div><div class="sub">edit per account below</div></div>
+      <div class="tile"><div class="lbl">Savings targets</div><div class="val num">${gbp(fc.goals)}</div><div class="sub">from the Savings page</div></div>
+      <div class="tile"><div class="lbl">Planned extras</div><div class="val num">${gbp(fc.extras)}</div><div class="sub">${fc.extraIn ? `plus ${gbp(fc.extraIn, { dp: 0 })} one-off income` : 'known one-offs'}</div></div>
     </div>
-    <div class="card"><div class="cardhead"><h2>Forecast by account</h2><span class="small muted">edit the shaded figures</span></div><div class="tw"><table id="planTable"><thead><tr><th>Account</th><th class="num">Opening</th><th class="num">Income</th><th class="num">Transfers in</th><th class="num">Transfers out</th><th class="num">Set payments</th><th class="num">Savings targets</th><th class="num">Extra income</th><th class="num">Planned extras</th><th class="num">Budget left</th></tr></thead><tbody>
-      ${fc.accounts.map(o => `<tr data-acc="${o.a.id}"><td><span class="payee">${esc(o.a.name)}</span>${o.a.balanceOnly ? '<div class="ref">balance from Settings</div>' : o.a.pending ? '<div class="ref">awaiting statement</div>' : ''}</td><td class="num"><input class="f opening" type="number" step="0.01" value="${o.opening}"></td><td class="num"><input class="f income" type="number" step="0.01" value="${o.income}"></td><td class="num pos">${o.tIn ? gbp(o.tIn) : '—'}</td><td class="num">${o.tOut ? gbp(o.tOut) : '—'}</td><td class="num">${gbp(o.fixed)}</td><td class="num">${o.goals ? gbp(o.goals) : '—'}</td><td class="num pos">${o.extraIn ? gbp(o.extraIn) : '—'}</td><td class="num">${o.extras ? gbp(o.extras) : '—'}</td><td class="num ${o.end < 0 ? 'neg' : 'pos'}"><b>${gbp(o.end)}</b></td></tr>`).join('')}
-      <tr class="total"><td>Household</td><td></td><td class="num">${gbp(fc.income)}</td><td></td><td></td><td class="num">${gbp(fc.fixed)}</td><td class="num">${gbp(fc.goals)}</td><td class="num pos">${gbp(fc.extraIn)}</td><td class="num">${gbp(fc.extras)}</td><td class="num ${fc.budget < 0 ? 'neg' : 'pos'}">${gbp(fc.budget)}</td></tr>
-    </tbody></table></div><div class="help">Opening balance is the latest statement balance; transfers between our accounts cancel out at household level. Credit cards are not cash accounts, so they appear through their minimum payments only.</div></div>
-    <div class="card"><div class="cardhead"><h2>What if everyday spending stays as in ${monthLabel(bm)}?</h2></div><div class="grid g4 tiles">
-      <div class="tile"><div class="lbl">Everyday spend last month</div><div class="val num">${gbp(fc.allow)}</div><div class="sub">groceries, fuel, kids, shopping…</div></div>
-      <div class="tile"><div class="lbl">of which optional</div><div class="val num">${gbp(fc.baseOpt)}</div><div class="sub">beauty, clothing, eating out, extras</div></div>
-      <div class="tile"><div class="lbl">Zilch / Clearpay</div><div class="val num">${gbp(fc.bnpl)}</div><div class="sub">instalments if nothing new is bought</div></div>
-      <div class="tile ${fc.spare < 0 ? 'hero neg' : 'hero'}"><div class="lbl">${fc.spare < 0 ? 'Would leave a shortfall of' : 'Would still leave'}</div><div class="val num">${gbp(fc.spare)}</div><div class="sub">cut optional spend to save up to ${gbp(fc.baseOpt, { dp: 0 })}</div></div>
-    </div></div>
+    <div class="card"><div class="cardhead"><h2>Household waterfall · ${monthLabel(ym)}</h2></div><div class="tw"><table class="wf"><tbody>
+      <tr><td>Fixed income (ORN into Thinc, Itravelmix into One Holidays)</td><td class="num pos">${gbp(fc.income, { sign: true })}</td></tr>
+      ${fc.extraIn ? `<tr><td>One-off income</td><td class="num pos">${gbp(fc.extraIn, { sign: true })}</td></tr>` : ''}
+      <tr class="sub"><td>Pay ourselves: ${dr.filter(d => d.on !== false).map(d => esc(d.label) + ' ' + gbp(d.amount, { dp: 0 })).join(', ') || 'none set'}</td><td class="num">(${gbp(fc.drawsOut)} moved between our accounts)</td></tr>
+      <tr><td>Direct debits, standing orders and regular payments</td><td class="num">${gbp(-fc.fixed, { sign: true })}</td></tr>
+      <tr><td>Zilch / Clearpay instalments (estimate)</td><td class="num">${gbp(-fc.bnpl, { sign: true })}</td></tr>
+      <tr><td>Savings targets</td><td class="num">${gbp(-fc.goals, { sign: true })}</td></tr>
+      <tr><td>Planned extras</td><td class="num">${gbp(-fc.extras, { sign: true })}</td></tr>
+      <tr class="total"><td>Surplus to budget</td><td class="num ${fc.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.surplus, { sign: true })}</td></tr>
+      <tr><td>Budgets set for the month</td><td class="num">${gbp(-fc.budgetTotal, { sign: true })}</td></tr>
+      <tr class="total"><td>Left after budgets</td><td class="num ${fc.remaining < 0 ? 'neg' : 'pos'}">${gbp(fc.remaining, { sign: true })}</td></tr>
+    </tbody></table></div></div>
+    <div class="card"><div class="cardhead"><h2>Budgets for ${monthLabel(ym)}</h2><span class="small muted">${fc.hasActual ? `${Math.round(elapsed * 100)}% of the month elapsed · actuals from uploaded statements` : 'actuals appear once statements for this month are uploaded'}</span></div>
+      <div class="tw"><table id="budgetTable"><thead><tr><th>Category</th><th class="num">Last month</th><th class="num">Budget</th><th class="num">Spent so far</th><th class="num">Left</th><th style="min-width:160px">Progress</th><th></th></tr></thead><tbody>
+        ${fc.budgets.map(b => { const spent = fc.hasActual ? r2(fc.act.byCat[b.cat] || 0) : 0; const left = r2(b.amt - spent); const pct = b.amt ? Math.min(100, Math.round(spent / b.amt * 100)) : 0; const over = spent > b.amt || (elapsed > 0 && pct > elapsed * 100 + 10); return `<tr data-cat="${esc(b.cat)}"><td><i class="dot" style="background:${catColor(b.cat)}"></i>${esc(b.cat)}</td><td class="num muted">${gbp(fc.baseVarCat[b.cat] || fc.base.byCat[b.cat] || 0)}</td><td class="num"><input class="bamt" type="number" step="1" value="${b.amt}" style="width:95px;text-align:right"></td><td class="num">${fc.hasActual ? gbp(spent) : '—'}</td><td class="num ${left < 0 ? 'neg' : ''}">${fc.hasActual ? gbp(left) : '—'}</td><td><div class="stripe" style="height:8px;position:relative"><i style="width:${pct}%;background:${over ? 'var(--bad)' : 'var(--good)'}"></i>${elapsed > 0 && elapsed < 1 ? `<span style="position:absolute;left:${Math.round(elapsed * 100)}%;top:-3px;width:2px;height:14px;background:var(--fg)" title="today"></span>` : ''}</div></td><td><button class="btn sm ghost brm">Remove</button></td></tr>`; }).join('')}
+        <tr class="total"><td>Total budgets</td><td class="num muted">${gbp(r2(fc.budgets.reduce((x, b) => x + (fc.baseVarCat[b.cat] || fc.base.byCat[b.cat] || 0), 0)))}</td><td class="num">${gbp(fc.budgetTotal)}</td><td class="num">${fc.hasActual ? gbp(r2(fc.budgets.reduce((x, b) => x + (fc.act.byCat[b.cat] || 0), 0))) : '—'}</td><td colspan="3"></td></tr>
+      </tbody></table></div>
+      <form id="budgetForm" class="toolbar" style="margin-top:8px"><select id="bCatSel">${catOptions.filter(c => !pl.budgets || pl.budgets[c] == null).map(c => `<option>${c}</option>`).join('')}</select><input type="number" id="bAmt" step="1" min="0" placeholder="Budget £" required style="width:110px"><button class="btn sm" type="submit">Add budget</button><button class="btn sm ghost" type="button" id="bSuggest">Suggest from last month's optional spend</button></form>
+    </div>
+    <div class="card"><div class="cardhead"><h2>By account</h2><span class="small muted">edit the shaded figures</span></div><div class="tw"><table id="planTable"><thead><tr><th>Account</th><th class="num">Opening</th><th class="num">Income</th><th class="num">Pay in</th><th class="num">Pay out</th><th class="num">Set payments</th><th class="num">Zilch/Clearpay est.</th><th class="num">Savings</th><th class="num">Extras</th><th class="num">Surplus</th><th class="num">End of month</th></tr></thead><tbody>
+      ${fc.accounts.map(o => `<tr data-acc="${o.a.id}"><td><span class="payee">${esc(o.a.name)}</span>${o.a.balanceOnly ? '<div class="ref">balance from Settings</div>' : ''}</td><td class="num"><input class="f opening" type="number" step="0.01" value="${o.opening}"></td><td class="num"><input class="f income" type="number" step="0.01" value="${o.income}"></td><td class="num pos">${o.tIn ? gbp(o.tIn) : '—'}</td><td class="num">${o.tOut ? gbp(o.tOut) : '—'}</td><td class="num">${gbp(o.fixed)}</td><td class="num"><input class="f bnpl" type="number" step="0.01" value="${o.bnpl}"></td><td class="num">${o.goals ? gbp(o.goals) : '—'}</td><td class="num">${o.extras || o.extraIn ? gbp(r2(o.extraIn - o.extras), { sign: true }) : '—'}</td><td class="num ${o.surplus < 0 ? 'neg' : 'pos'}">${gbp(o.surplus, { sign: true })}</td><td class="num ${o.end < 0 ? 'neg' : 'pos'}"><b>${gbp(o.end)}</b></td></tr>`).join('')}
+      <tr class="total"><td>Household</td><td></td><td class="num">${gbp(fc.income)}</td><td></td><td></td><td class="num">${gbp(fc.fixed)}</td><td class="num">${gbp(fc.bnpl)}</td><td class="num">${gbp(fc.goals)}</td><td class="num">${gbp(r2(fc.extraIn - fc.extras), { sign: true })}</td><td class="num ${fc.surplus < 0 ? 'neg' : 'pos'}">${gbp(fc.surplus, { sign: true })}</td><td></td></tr>
+    </tbody></table></div><div class="help">A negative surplus on one account with a positive one elsewhere means a payment should be switched: use Paid from on the DD &amp; SO page or Action → Switch on the Review page. Credit cards appear through their minimum payments only.</div></div>
     <div class="grid g2">
-      <div class="card"><div class="cardhead"><h3>Set payments next month, by account</h3></div>${fc.accounts.filter(o => o.fixedRows.length).map(o => `<details open><summary>${esc(o.a.name)} <span class="num muted small">${gbp(o.fixed)}</span></summary><div class="tw"><table><tbody>${o.fixedRows.map(r => `<tr><td class="num muted">${ordinal(r.day)}</td><td>${esc(r.payee)}</td><td class="small muted">${r.type}</td><td class="num">${gbp(r.planAmt)}</td></tr>`).join('')}</tbody></table></div></details>`).join('')}</div>
-      <div class="card"><div class="cardhead"><h3>Planned extras for ${monthLabel(ym)}</h3></div><div class="help">Known one-offs coming up, in or out: car sale, backdated VAT, school fees, car service, holiday deposits.</div>
+      <div class="card"><div class="cardhead"><h3>Set payments next month, by account</h3></div>${fc.accounts.filter(o => o.fixedRows.length).map(o => `<details><summary>${esc(o.a.name)} <span class="num muted small">${gbp(o.fixed)} · ${o.fixedRows.length}</span></summary><div class="tw"><table><tbody>${o.fixedRows.map(r => `<tr><td class="num muted">${ordinal(r.day)}</td><td>${esc(r.payee)}</td><td class="small muted">${r.type}</td><td class="num">${gbp(r.planAmt)}</td></tr>`).join('')}</tbody></table></div></details>`).join('')}</div>
+      <div class="card"><div class="cardhead"><h3>Planned extras for ${monthLabel(ym)}</h3></div><div class="help">Known one-offs, in or out: car sale, backdated VAT, school fees, car service, holiday deposits.</div>
         <form id="extraForm" class="toolbar" style="margin-top:8px"><select id="xKind"><option value="cost">Cost</option><option value="income">Income</option></select><input type="text" id="xPayee" placeholder="What" required><input type="number" id="xAmount" step="0.01" min="0" placeholder="£" required style="width:100px"><select id="xAcc">${fc.accounts.map(o => `<option value="${o.a.id}">${o.a.name}</option>`).join('')}</select><input type="number" id="xDay" min="1" max="31" placeholder="Day" style="width:70px"><button class="btn sm" type="submit">Add</button></form>
         ${pl.extras.length ? `<div class="tw" style="margin-top:8px"><table><tbody>${pl.extras.map((e, i) => `<tr><td class="num muted">${e.day ? ordinal(e.day) : ''}</td><td class="payee">${esc(e.payee)}</td><td class="small">${esc(accName(e.acc))}</td><td class="num ${e.kind === 'income' ? 'pos' : ''}">${gbp(e.kind === 'income' ? e.amount : -e.amount, { sign: true })}</td><td><button class="btn sm danger" data-x="${i}">Remove</button></td></tr>`).join('')}</tbody></table></div>` : ''}
       </div>
     </div>
-    <div class="card"><div class="cardhead"><h2>Month by month</h2><span class="small muted">actual to date, then forecast</span></div><div class="chartbox"><canvas id="chPlan"></canvas></div></div>
+    <div class="card"><div class="cardhead"><h2>Month by month</h2><span class="small muted">actual to date, then forecast (set payments + estimates)</span></div><div class="chartbox"><canvas id="chPlan"></canvas></div></div>
   </div>`;
   $('#planMonth').onchange = e => { view.planMonth = e.target.value; render(); };
   $('#planBase').onchange = e => { state.plan.base = e.target.value; persist(); render(); };
-  $$('#planTable tr[data-acc]').forEach(tr => { const acc = tr.dataset.acc; $$('input.f', tr).forEach(inp => inp.onchange = () => { const k = inp.classList.contains('opening') ? 'opening' : 'income'; pl[k][acc] = +inp.value || 0; persist(); render(); }); });
+  $$('#planTable tr[data-acc]').forEach(tr => { const acc = tr.dataset.acc; $$('input.f', tr).forEach(inp => inp.onchange = () => { const k = inp.classList.contains('opening') ? 'opening' : inp.classList.contains('income') ? 'income' : 'bnpl'; pl[k][acc] = +inp.value || 0; persist(); render(); }); });
   $('#extraForm').onsubmit = e => { e.preventDefault(); pl.extras.push({ payee: $('#xPayee').value.trim(), amount: +$('#xAmount').value || 0, acc: $('#xAcc').value, day: +$('#xDay').value || null, kind: $('#xKind').value }); persist(); render(); };
   $$('[data-x]').forEach(b => b.onclick = () => { pl.extras.splice(+b.dataset.x, 1); persist(); render(); });
+  pl.budgets = pl.budgets || {};
+  $('#budgetForm').onsubmit = e => { e.preventDefault(); pl.budgets[$('#bCatSel').value] = +$('#bAmt').value || 0; persist(); render(); };
+  $('#bSuggest').onclick = () => { for (const c of OPTIONAL_CATS.concat(['Food & Groceries', 'Car & Fuel', 'Kids & School', 'Travel & Parking'])) { const v = fc.baseVarCat[c]; if (v && pl.budgets[c] == null) pl.budgets[c] = Math.round(v); } persist(); render(); toast('Budgets suggested – edit the amounts'); };
+  $$('#budgetTable tr[data-cat]').forEach(tr => { const c = tr.dataset.cat; $('input.bamt', tr).onchange = e => { pl.budgets[c] = +e.target.value || 0; persist(); render(); }; $('button.brm', tr).onclick = () => { delete pl.budgets[c]; persist(); render(); }; });
   if (typeof Chart === 'undefined') return;
-  const labels = ms.concat(future); const act = ms.map(m => summary(m)); const fcs = future.map(m => forecast(m));
-  charts.plan = new Chart($('#chPlan'), { type: 'bar', data: { labels: labels.map(m => monthLabel(m).slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: act.map(a => a.income + a.incomeOne).concat(fcs.map(f => r2(f.income + f.extraIn))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c1') : css('--c1') + '80'), borderRadius: 4 }, { label: 'Outgoings', data: act.map(a => a.out).concat(fcs.map(f => r2(f.fixed + f.extras + f.goals))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c2') : css('--c2') + '80'), borderRadius: 4 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '£' + (v / 1000) + 'k' }, grid: { color: css('--line') } }, x: { grid: { display: false } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${gbp(c.parsed.y)}` } } } } });
+  const fut = future.filter(m => !ms.includes(m)); const labels = ms.concat(fut); const act = ms.map(m => summary(m)); const fcs = fut.map(m => forecast(m));
+  charts.plan = new Chart($('#chPlan'), { type: 'bar', data: { labels: labels.map(m => monthLabel(m).slice(0, 3) + ' ' + m.slice(2, 4)), datasets: [{ label: 'Income', data: act.map(a => a.income + a.incomeOne).concat(fcs.map(f => r2(f.income + f.extraIn))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c1') : css('--c1') + '80'), borderRadius: 4 }, { label: 'Outgoings', data: act.map(a => a.out).concat(fcs.map(f => r2(f.fixed + f.bnpl + f.extras + f.goals + f.budgetTotal))), backgroundColor: labels.map((m, i) => i < ms.length ? css('--c2') : css('--c2') + '80'), borderRadius: 4 }] }, options: { maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '£' + (v / 1000) + 'k' }, grid: { color: css('--line') } }, x: { grid: { display: false } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${gbp(c.parsed.y)}` } } } } });
 }
 
 /* ---------------- expenses & claims ---------------- */
@@ -1493,6 +1520,67 @@ function renderSavings(main) {
   });
 }
 
+/* ---------------- review: one row per payee across all accounts ---------------- */
+function payeeRegister() {
+  const tx = allTx().filter(t => t.v < 0 && t.group !== 'income' && !t.manual);
+  const g = {};
+  for (const t of tx) {
+    const k = t.a + '|' + t.pk;
+    const r = g[k] = g[k] || { key: k, pk: t.pk, acc: t.a, payee: t.p, bank: t.k === 'DD' ? 'DD' : t.k === 'SO' ? 'SO' : 'Card/Transfer', kinds: new Set(), cat: t.cat, type: t.type, ess: t.ess, exp: t.exp, from: t.claimFrom, note: t.note, n: 0, total: 0, months: {}, last: t, ids: [], action: t.action };
+    r.kinds.add(t.k); r.n++; r.total = r2(r.total - t.v); r.months[t.m] = r2((r.months[t.m] || 0) - t.v); r.ids.push(t.id); if (t.d > r.last.d) r.last = t;
+  }
+  return Object.values(g).map(r => { const ms = Object.keys(r.months).sort(); const bnpl = r.cat === 'Zilch / Clearpay'; return Object.assign(r, { monthsN: ms.length, latest: r.months[ms[ms.length - 1]], avg: r2(r.total / Math.max(1, ms.length)), day: dayOf(r.last.d), bank: r.kinds.has('DD') ? 'DD' : r.kinds.has('SO') ? 'SO' : bnpl ? 'BNPL' : (r.kinds.has('payment') ? 'Transfer' : 'Card'), inPlan: r.type === 'regular' && !r.action }); });
+}
+function setPayeeProps(r, props) {
+  // props: {cat,type,ess,exp,from,note,action,to}
+  for (const id of r.ids) { const o = state.over[id] = Object.assign({}, state.over[id]); if (props.cat) o.c = props.cat; if (props.type) o.t = props.type; if (props.ess != null) o.ess = props.ess; if (props.exp != null) { o.exp = props.exp; if (props.from) o.from = props.from; } if (props.note != null) o.n = props.note; }
+  if (props.cat) state.payeeCat[r.pk] = props.cat;
+  if (props.type) { state.payeeType[r.pk] = props.type; if (props.type !== 'regular') state.notRecurring[r.pk] = true; else delete state.notRecurring[r.pk]; }
+  if (props.ess != null) state.payeeEss[r.pk] = props.ess;
+  if (props.exp != null) state.payeeExp[r.pk] = { exp: props.exp, from: props.from || r.from };
+  if (props.note != null) state.payeeNote[r.pk] = props.note;
+  if (props.action === 'cancel') upsertAction({ kind: 'cancel', key: r.key, pk: r.pk, acc: r.acc, payee: r.payee, amount: r.latest });
+  else if (props.action === 'switch') upsertAction({ kind: 'switch', key: r.key, pk: r.pk, acc: r.acc, to: props.to, payee: r.payee, amount: r.latest });
+  else if (props.action === 'clear') state.actions = state.actions.filter(x => x.key !== r.key);
+  persist();
+}
+function renderReview(main) {
+  const f = view.reviewFilter = view.reviewFilter || { bank: 'all', type: 'all', acc: 'all' };
+  const all = payeeRegister();
+  let rows = all.slice();
+  if (f.bank !== 'all') rows = rows.filter(r => r.bank === f.bank);
+  if (f.type !== 'all') rows = rows.filter(r => r.type === f.type);
+  if (f.acc !== 'all') rows = rows.filter(r => r.acc === f.acc);
+  rows.sort((a, b) => (a.bank === b.bank ? 0 : ['DD', 'SO', 'Transfer', 'Card', 'BNPL'].indexOf(a.bank) - ['DD', 'SO', 'Transfer', 'Card', 'BNPL'].indexOf(b.bank)) || b.latest - a.latest);
+  const cnt = k => all.filter(r => r.bank === k).length;
+  const tcount = k => all.filter(r => r.type === k).length;
+  const planTotal = r2(all.filter(r => r.inPlan && r.bank !== 'BNPL').reduce((x, r) => x + r.latest, 0));
+  main.innerHTML = `<div class="section">
+    <div class="toolbar"><h1>Review payees</h1><div class="spacer"></div><span class="pill n num">${gbp(planTotal)} / month in next month's plan</span></div>
+    <div class="help">One line per payee across every account, grouped by how the bank takes it. Set the <b>Type</b> here and it applies to every transaction for that payee and to future statements: only <b>Regular</b> payees go into next month's planner. Use Action to cancel or switch, and Need to mark optional spend. Filters at the top narrow the list; the column boxes filter further.</div>
+    <div class="chips" id="rvBank"><button class="chip ${f.bank === 'all' ? 'on' : ''}" data-bank="all">All (${all.length})</button><button class="chip ${f.bank === 'DD' ? 'on' : ''}" data-bank="DD">Direct debits (${cnt('DD')})</button><button class="chip ${f.bank === 'SO' ? 'on' : ''}" data-bank="SO">Standing orders (${cnt('SO')})</button><button class="chip ${f.bank === 'Transfer' ? 'on' : ''}" data-bank="Transfer">Bank transfers (${cnt('Transfer')})</button><button class="chip ${f.bank === 'Card' ? 'on' : ''}" data-bank="Card">Card payments (${cnt('Card')})</button><button class="chip ${f.bank === 'BNPL' ? 'on' : ''}" data-bank="BNPL">Zilch / Clearpay (${cnt('BNPL')})</button></div>
+    <div class="chips" id="rvType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">Any type</button>${TYPES.map(x => `<button class="chip ${f.type === x[0] ? 'on' : ''}" data-type="${x[0]}">${x[1]} (${tcount(x[0])})</button>`).join('')}</div>
+    <div class="chips" id="rvAcc"><button class="chip ${f.acc === 'all' ? 'on' : ''}" data-acc="all">All accounts</button>${allAccounts().filter(a => a.type !== 'manual').map(a => `<button class="chip ${f.acc === a.id ? 'on' : ''}" data-acc="${a.id}">${a.name}</button>`).join('')}</div>
+    <div class="card"><div class="tw"><table id="rvTable"><thead><tr><th>Payee</th><th>Account</th><th>Bank</th><th class="num">Latest</th><th class="num">Months</th><th class="num">Avg / month</th><th>Type</th><th>In plan</th><th>Category</th><th>Need</th><th>Work exp.</th><th>Action</th><th>Note</th></tr></thead><tbody>
+      ${rows.map(r => `<tr data-key="${esc(r.key)}"><td><span class="payee">${esc(r.payee)}</span><div class="ref">${r.n} transaction${r.n > 1 ? 's' : ''} · last ${shortDate(r.last.d)}</div></td><td class="small">${esc(accName(r.acc))}</td><td><span class="pill ${r.bank === 'DD' || r.bank === 'SO' ? 'n' : r.bank === 'BNPL' ? 'warn' : 'good'}">${r.bank}</span></td><td class="num" data-v="${r.latest}"><b>${gbp(r.latest)}</b></td><td class="num">${r.monthsN}</td><td class="num" data-v="${r.avg}">${gbp(r.avg)}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === r.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td data-v="${r.inPlan ? 'yes' : 'no'}">${r.inPlan ? '<span class="pill good">Yes</span>' : r.action ? `<span class="pill bad">${r.action.kind === 'cancel' ? 'Cancelled' : 'Switch'}</span>` : '<span class="pill">No</span>'}</td><td>${catSelect('cat', r.cat)}</td><td><select class="ess"><option value="1" ${r.ess ? 'selected' : ''}>Essential</option><option value="0" ${r.ess ? '' : 'selected'}>Optional</option></select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${r.exp ? 'checked' : ''}> <select class="from" ${r.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === r.from ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td><select class="act"><option value="">${r.action ? '✓ ' + (r.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(r.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${r.action ? '<option value="clear">Undo action</option>' : ''}</select></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td></tr>`).join('')}
+      <tr class="total"><td colspan="3">Shown (${rows.length})</td><td class="num">${gbp(r2(rows.reduce((x, r) => x + r.latest, 0)))}</td><td colspan="9"></td></tr>
+    </tbody></table></div></div>
+  </div>`;
+  $$('#rvBank .chip').forEach(b => b.onclick = () => { f.bank = b.dataset.bank; render(); });
+  $$('#rvType .chip').forEach(b => b.onclick = () => { f.type = b.dataset.type; render(); });
+  $$('#rvAcc .chip').forEach(b => b.onclick = () => { f.acc = b.dataset.acc; render(); });
+  $$('#rvTable tr[data-key]').forEach(tr => {
+    const r = all.find(x => x.key === tr.dataset.key);
+    $('select.typ', tr).onchange = e => { setPayeeProps(r, { type: e.target.value }); render(); toast(`${r.payee}: ${e.target.selectedOptions[0].text}`); };
+    $('select.cat', tr).onchange = e => { if (e.target.value === '__new__') { newCategoryInline(e.target, c => { setPayeeProps(r, { cat: c }); render(); }); return; } setPayeeProps(r, { cat: e.target.value }); render(); };
+    $('select.ess', tr).onchange = e => { setPayeeProps(r, { ess: e.target.value === '1' }); toast(e.target.value === '1' ? 'Essential' : 'Optional'); };
+    $('input.exp', tr).onchange = e => { const sel = $('select.from', tr); sel.hidden = !e.target.checked; setPayeeProps(r, { exp: e.target.checked, from: sel.value }); };
+    $('select.from', tr).onchange = e => setPayeeProps(r, { exp: true, from: e.target.value });
+    $('select.act', tr).onchange = e => { const v = e.target.value; if (v === 'cancel') { setPayeeProps(r, { action: 'cancel' }); render(); } else if (v === 'switch') newAccountPick(e.target, acc => { setPayeeProps(r, { action: 'switch', to: acc }); render(); }); else if (v === 'clear') { setPayeeProps(r, { action: 'clear' }); render(); } };
+    $('input.note', tr).onchange = e => { setPayeeProps(r, { note: e.target.value }); toast('Note saved'); };
+  });
+}
+
 /* ---- SETTINGS ---- */
 function renderSettings(main) {
   const s = state.settings;
@@ -1520,6 +1608,10 @@ function renderSettings(main) {
         <div class="toolbar" style="margin-top:8px"><button class="btn" id="exportXlsx">Download Excel</button><button class="btn ghost" id="exportJson">Backup (JSON)</button><label class="btn ghost" style="cursor:pointer">Restore backup<input type="file" id="importJson" accept=".json" class="hide"></label></div>
         <div id="exportMsg" class="small muted" style="margin-top:6px"></div>
       </div>
+      <div class="card"><h3>Pay ourselves each month</h3><div class="help">Salaries and dividends drawn from Thinc (or One Holidays). These feed the planner as fixed transfers between our own accounts.</div>
+        <div class="tw" style="margin-top:8px"><table><thead><tr><th>Label</th><th>From</th><th>To</th><th class="num">Amount</th><th>Day</th><th>On</th><th></th></tr></thead><tbody>${(s.draws || []).map(d => `<tr data-draw="${d.id}"><td>${esc(d.label)}</td><td class="small">${esc(accName(d.from))}</td><td class="small">${esc(accName(d.to))}</td><td class="num"><input class="damt" type="number" step="0.01" value="${d.amount}" style="width:100px;text-align:right"></td><td class="num">${d.day || ''}</td><td><input class="don" type="checkbox" ${d.on === false ? '' : 'checked'}></td><td><button class="btn sm danger ddel">Remove</button></td></tr>`).join('')}</tbody></table></div>
+        <form id="drawForm" class="toolbar" style="margin-top:8px"><input type="text" id="dLabel" placeholder="Label, e.g. Dividend – Ajay" required><select id="dFrom">${allAccounts().filter(a => a.type === 'business').map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select><span class="small muted">→</span><select id="dTo">${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit' && a.type !== 'business').map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select><input type="number" id="dAmt" step="0.01" placeholder="£" required style="width:100px"><input type="number" id="dDay" min="1" max="31" placeholder="Day" style="width:70px"><button class="btn ghost" type="submit">Add</button></form>
+      </div>
       <div class="card"><h3>Who expenses are claimed from</h3><div class="help">One per line.</div><textarea id="claimFrom" rows="4" style="width:100%;margin-top:6px">${esc(state.settings.claimFrom.join('\n'))}</textarea><div class="toolbar" style="margin-top:6px"><button class="btn ghost" id="saveClaimFrom">Save list</button></div></div>
       <div class="card"><h3>Categories</h3><div class="help">Your own categories appear in every category list. Built-in ones cannot be removed.</div>
         <div class="toolbar" style="margin-top:8px"><input type="text" id="ncName" placeholder="New category"><select id="ncGroup"><option value="variable">Everyday spend</option><option value="fixed">Fixed cost</option><option value="transfer">Transfer (ignored)</option><option value="income">Income</option></select><button class="btn ghost" id="ncAdd">Add</button></div>
@@ -1534,6 +1626,8 @@ function renderSettings(main) {
   </div>`;
   $('#saveSettings').onclick = () => { s.incomeThinc = +$('#sThinc').value || 0; s.incomeOneHolidays = +$('#sOne').value || 0; s.rent = +$('#sRent').value || 0; s.vat = +$('#sVat').value || 0; s.savingsBalance = +$('#sSav').value || 0; s.startMonth = $('#sStart').value.trim() || '2026-09'; persist(); toast('Settings saved'); };
   $('#savePin').onclick = () => { const p = $('#newPin').value.trim(); if (!/^\d{4,8}$/.test(p)) return toast('PIN must be 4 to 8 digits'); s.pin = p; persist(); $('#newPin').value = ''; toast('PIN changed'); };
+  $$('[data-draw]').forEach(tr => { const d = s.draws.find(x => x.id === tr.dataset.draw); $('input.damt', tr).onchange = e => { d.amount = +e.target.value || 0; persist(); }; $('input.don', tr).onchange = e => { d.on = e.target.checked; persist(); }; $('button.ddel', tr).onclick = () => { s.draws = s.draws.filter(x => x.id !== d.id); persist(); render(); }; });
+  $('#drawForm').onsubmit = e => { e.preventDefault(); s.draws.push({ id: 'd' + Date.now().toString(36), label: $('#dLabel').value.trim(), from: $('#dFrom').value, to: $('#dTo').value, amount: +$('#dAmt').value || 0, day: +$('#dDay').value || 4 }); persist(); render(); toast('Added'); };
   $('#accForm').onsubmit = e => { e.preventDefault(); addAccount({ name: $('#naName').value.trim(), bank: $('#naBank').value.trim(), last4: $('#naLast4').value.trim(), type: $('#naType').value, owner: $('#naOwner').value.trim() || 'Household' }); render(); toast('Account added'); };
   $$('[data-delacc]').forEach(b => b.onclick = () => { state.customAccounts = state.customAccounts.filter(a => a.id !== b.dataset.delacc); persist(); render(); });
   $('#saveClaimFrom').onclick = () => { const l = $('#claimFrom').value.split('\n').map(x => x.trim()).filter(Boolean); if (l.length) { state.settings.claimFrom = l; persist(); render(); toast('Saved'); } };
