@@ -731,7 +731,7 @@ function loadLocal() {
   try { const s = JSON.parse(localStorage.getItem('kawa.state') || 'null'); if (s && s.v === 1) state = Object.assign(state, s, { settings: Object.assign({}, DEFAULT_SETTINGS, s.settings || {}) }); } catch (e) { }
   try { session = JSON.parse(localStorage.getItem('kawa.session') || '{"user":null}'); } catch (e) { }
 }
-function ensureState() { state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); if (!state.settings.draws) state.settings.draws = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.draws)); if (!state.settings.cardPayments) state.settings.cardPayments = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.cardPayments)); state.bnpl = state.bnpl || []; if (!state.bnplSeeded && SEED.bnpl) { const have = new Set(state.bnpl.map(b => b.id)); for (const b of SEED.bnpl) if (!have.has(b.id)) state.bnpl.push(Object.assign({}, b)); state.bnplSeeded = true; } }
+function ensureState() { state.reviewed = state.reviewed || {}; state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); if (!state.settings.draws) state.settings.draws = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.draws)); if (!state.settings.cardPayments) state.settings.cardPayments = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.cardPayments)); state.bnpl = state.bnpl || []; if (!state.bnplSeeded && SEED.bnpl) { const have = new Set(state.bnpl.map(b => b.id)); for (const b of SEED.bnpl) if (!have.has(b.id)) state.bnpl.push(Object.assign({}, b)); state.bnplSeeded = true; } }
 function saveLocal() { try { localStorage.setItem('kawa.state', JSON.stringify(state)); } catch (e) { } }
 function persist() {
   state.updatedAt = Date.now();
@@ -1050,7 +1050,7 @@ function newAccountPick(sel, done) {
   sel.parentElement.appendChild(box);
   box.querySelector('button').onclick = () => { const v = box.querySelector('select').value; box.remove(); done(v); };
 }
-function upsertAction(a) { state.actions = (state.actions || []).filter(x => x.key !== a.key); a.id = 'a' + Date.now().toString(36); a.at = todayISO(); a.by = session.user || ''; state.actions.push(a); persist(); toast(a.kind === 'cancel' ? 'Cancelled from next month – see Actions' : 'Switch planned – see Actions'); }
+function upsertAction(a) { state.actions = (state.actions || []).filter(x => x.key !== a.key); a.id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); a.at = todayISO(); a.by = session.user || ''; state.actions.push(a); persist(); }
 function newCategoryInline(sel, done) {
   const box = document.createElement('div'); box.className = 'small'; box.style.marginTop = '4px';
   box.innerHTML = `<input type="text" placeholder="Category name" style="width:150px"> <select><option value="variable">Everyday</option><option value="fixed">Fixed cost</option><option value="transfer">Transfer (ignored)</option><option value="income">Income</option></select> <button class="btn sm">Add</button>`;
@@ -1261,25 +1261,46 @@ function setPayments() {
   return rows.filter(r => !(state.plan.hidden || {})[r.key]).sort((a, b) => a.day - b.day || b.amount - a.amount);
 }
 function renderSet(main) {
-  const rows = setPayments(); const f = view.setFilter = view.setFilter || { acc: 'all', type: 'all' };
-  const shown = rows.filter(r => (f.acc === 'all' || r.planAcc === f.acc || r.from === f.acc) && (f.type === 'all' || r.type === f.type));
+  const rows = setPayments(); const f = view.setFilter = view.setFilter || { acc: 'all', type: 'all', show: 'active' };
+  const matches = r => (f.acc === 'all' || r.planAcc === f.acc || r.from === f.acc) && (f.type === 'all' || r.type === f.type);
+  const active = rows.filter(r => !r.skip); const inactive = rows.filter(r => r.skip);
+  const shown = (f.show === 'active' ? active : f.show === 'inactive' ? inactive : rows).filter(matches);
   const types = ['DD', 'SO', 'Subscription', 'Transfer', 'Card payment', 'Set-aside'];
   const perAcc = allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => { const cur = r2(rows.filter(r => r.from === a.id && !r.skip).reduce((x, r) => x + r.planAmt, 0)); const plan = r2(rows.filter(r => r.planAcc === a.id && !r.skip).reduce((x, r) => x + r.planAmt, 0)); return { a, cur, plan }; }).filter(x => x.cur || x.plan);
   main.innerHTML = `<div class="section">
     <div class="toolbar"><h1>Direct debits & set payments</h1><div class="spacer"></div><span class="pill n num">${gbp(r2(rows.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))} / month</span></div>
-    <div class="help">Every direct debit, standing order, subscription, card payment and transfer to ourselves, across all banks, based on ${monthLabel(baseMonth())}. Use <b>Paid from</b> to plan moving a payment to a different account; the planner and the per-account totals update straight away. <b>Next month?</b> is ticked for everything we expect to go out; untick anything that will not be paid, so the planner shows a true picture. Payments seen only once start unticked until you confirm them. <b>Remove</b> takes a payment off this list for good (it becomes a one-off in Transactions). Removed items: ${Object.keys(state.plan.hidden || {}).length} <button class="btn sm ghost" id="unhide">restore all</button> Upload each month's statements and the register and planner update from the latest full month.</div>
+    <div class="help">Every direct debit, standing order, subscription, card payment and transfer to ourselves, across all banks, based on ${monthLabel(baseMonth())}. Use <b>Paid from</b> to plan moving a payment to a different account; the planner and the per-account totals update straight away. This page shows only what is going out next month. Untick <b>Next month?</b> and the row moves to the <b>Not in plan</b> list (it stays in history and can be ticked back). Payments seen only once sit in Not in plan until you confirm them. <b>Remove</b> takes a payment off this list for good (it becomes a one-off in Transactions). Removed items: ${Object.keys(state.plan.hidden || {}).length} <button class="btn sm ghost" id="unhide">restore all</button> Upload each month's statements and the register and planner update from the latest full month.</div>
     <div class="chips" id="setAcc"><button class="chip ${f.acc === 'all' ? 'on' : ''}" data-acc="all">All accounts</button>${allAccounts().filter(a => a.type !== 'manual').map(a => `<button class="chip ${f.acc === a.id ? 'on' : ''}" data-acc="${a.id}">${a.name}</button>`).join('')}</div>
     <div class="chips" id="setType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">All types</button>${types.map(t => `<button class="chip ${f.type === t ? 'on' : ''}" data-type="${t}">${t}</button>`).join('')}</div>
+    <div class="chips" id="setShow"><button class="chip ${f.show === 'active' ? 'on' : ''}" data-show="active">Going out next month (${active.length})</button><button class="chip ${f.show === 'inactive' ? 'on' : ''}" data-show="inactive">Not in plan: cancelled, unticked, seen once (${inactive.length})</button><button class="chip ${f.show === 'all' ? 'on' : ''}" data-show="all">Everything</button></div>
+    <div class="bulk" id="setBulk"><label class="small"><input type="checkbox" class="selall"> Select all shown</label><span class="small muted sel-count">0 selected</span>
+      <select class="bnext"><option value="">Next month…</option><option value="1">Yes – goes out</option><option value="0">No – not next month</option></select>
+      <select class="bfrom"><option value="">Paid from…</option>${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select>
+      <button class="btn sm bapply" disabled>Apply to selected</button></div>
     <div class="grid g4 tiles">${perAcc.map(x => `<div class="tile"><div class="lbl">${esc(x.a.name)}</div><div class="val num">${gbp(x.plan)}</div><div class="sub">${x.plan !== x.cur ? `now ${gbp(x.cur)} → planned ${gbp(x.plan)}` : 'per month, no changes planned'}</div></div>`).join('')}</div>
-    <div class="card"><div class="tw"><table id="setTable"><thead><tr><th>Day</th><th>Payee</th><th>Type</th><th>Category</th><th class="num">Amount</th><th>Paid from (planned)</th><th>Next month?</th><th>Note</th><th></th></tr></thead><tbody>
-      ${shown.map(r => `<tr data-key="${esc(r.key)}" data-pk="${esc(r.pk)}" style="${r.skip ? 'opacity:.5' : ''}"><td class="num">${ordinal(r.day)}</td><td><span class="payee">${esc(r.payee)}</span>${r.to && r.type === 'Transfer' ? '' : `<div class="ref">${esc(accName(r.from))}${r.planAcc !== r.from ? ' → moving to ' + esc(accName(r.planAcc)) : ''}${r.action && r.action.kind === 'cancel' ? ' · <b>cancelled</b>' : ''}</div>`}</td><td class="small muted">${r.type}${r.confirmed ? '' : '<div class="ref">seen once – tick if it is monthly</div>'}</td><td><i class="dot" style="background:${catColor(r.cat)}"></i>${esc(r.cat)}</td><td class="num"><input class="amt" type="number" step="0.01" value="${r.planAmt}" style="width:95px;text-align:right"></td><td>${r.locked ? `<span class="small muted">${r.type === 'Card payment' ? 'Settings → Card payments' : 'Settings → Pay ourselves'}</span>` : `<select class="from">${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}" ${a.id === r.planAcc ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`}</td><td><input class="skip" type="checkbox" ${r.skip ? '' : 'checked'} title="Tick if this will be paid next month"></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td><td>${r.locked ? '' : '<button class="btn sm danger rm" title="Remove from set payments (it stays in Transactions as a one-off)">Remove</button>'}</td></tr>`).join('')}
-      <tr class="total"><td colspan="4">Total shown</td><td class="num">${gbp(r2(shown.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))}</td><td colspan="4"></td></tr>
+    <div class="card"><div class="tw"><table id="setTable"><thead><tr><th><input type="checkbox" id="setSelHead"></th><th>Day</th><th>Payee</th><th>Type</th><th>Category</th><th class="num">Amount</th><th>Paid from (planned)</th><th>Next month?</th><th>Note</th><th></th></tr></thead><tbody>
+      ${shown.map(r => `<tr data-key="${esc(r.key)}" data-pk="${esc(r.pk)}" style="${r.skip ? 'opacity:.5' : ''}"><td>${r.locked ? '' : '<input type="checkbox" class="pick">'}</td><td class="num">${ordinal(r.day)}</td><td><span class="payee">${esc(r.payee)}</span>${r.to && r.type === 'Transfer' ? '' : `<div class="ref">${esc(accName(r.from))}${r.planAcc !== r.from ? ' → moving to ' + esc(accName(r.planAcc)) : ''}${r.action && r.action.kind === 'cancel' ? ' · <b>cancelled</b>' : ''}</div>`}</td><td class="small muted">${r.type}${r.confirmed ? '' : '<div class="ref">seen once – tick if it is monthly</div>'}</td><td><i class="dot" style="background:${catColor(r.cat)}"></i>${esc(r.cat)}</td><td class="num"><input class="amt" type="number" step="0.01" value="${r.planAmt}" style="width:95px;text-align:right"></td><td>${r.locked ? `<span class="small muted">${r.type === 'Card payment' ? 'Settings → Card payments' : 'Settings → Pay ourselves'}</span>` : `<select class="from">${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="${a.id}" ${a.id === r.planAcc ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`}</td><td><input class="skip" type="checkbox" ${r.skip ? '' : 'checked'} title="Tick if this will be paid next month"></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td><td>${r.locked ? '' : '<button class="btn sm danger rm" title="Remove from set payments (it stays in Transactions as a one-off)">Remove</button>'}</td></tr>`).join('')}
+      <tr class="total"><td colspan="5">Total shown</td><td class="num">${gbp(r2(shown.filter(r => !r.skip).reduce((x, r) => x + r.planAmt, 0)))}</td><td colspan="4"></td></tr>
     </tbody></table></div></div>
   </div>`;
   main.insertAdjacentHTML('beforeend', '<div class="section" id="fixedHistory" style="margin-top:14px"></div>'); renderFixed($('#fixedHistory'), true);
   $('#unhide').onclick = () => { state.plan.hidden = {}; persist(); render(); };
   $$('#setAcc .chip').forEach(b => b.onclick = () => { f.acc = b.dataset.acc; render(); });
   $$('#setType .chip').forEach(b => b.onclick = () => { f.type = b.dataset.type; render(); });
+  $$('#setShow .chip').forEach(b => b.onclick = () => { f.show = b.dataset.show; render(); });
+  { const bar = $('#setBulk'); const picks = () => $$('#setTable tr[data-key]:not([hidden]) input.pick'); const selected = () => picks().filter(c => c.checked).map(c => c.closest('tr').dataset.key);
+    const refresh = () => { const n = selected().length; $('.sel-count', bar).textContent = n + ' selected'; $('.bapply', bar).disabled = !n; };
+    const selAll = v => { picks().forEach(c => c.checked = v); refresh(); };
+    $('.selall', bar).onchange = e => selAll(e.target.checked); $('#setSelHead').onchange = e => selAll(e.target.checked);
+    $('#setTable').addEventListener('change', e => { if (e.target.classList.contains('pick')) refresh(); });
+    $('.bapply', bar).onclick = () => { const keys = selected(); if (!keys.length) return; const nx = $('.bnext', bar).value, fr = $('.bfrom', bar).value; if (!nx && !fr) { toast('Choose what to set first'); return; }
+      state.plan.skip = state.plan.skip || {};
+      for (const k of keys) { const r = rows.find(x => x.key === k); if (!r) continue;
+        if (nx === '1') { state.plan.skip[k] = false; state.actions = state.actions.filter(x => !(x.key === k && x.kind === 'cancel')); }
+        else if (nx === '0') { state.plan.skip[k] = true; if (r.confirmed) upsertAction({ kind: 'cancel', key: k, pk: r.pk, acc: r.from, payee: r.payee, amount: r.planAmt }); }
+        if (fr) { if (fr === r.from) { state.actions = state.actions.filter(x => !(x.key === k && x.kind === 'switch')); delete (state.plan.moves || {})[k]; } else upsertAction({ kind: 'switch', key: k, pk: r.pk, acc: r.from, to: fr, payee: r.payee, amount: r.planAmt }); } }
+      persist(); render(); toast(`Updated ${keys.length} payment${keys.length > 1 ? 's' : ''}`); };
+  }
   $$('#setTable tr[data-key]').forEach(tr => {
     const key = tr.dataset.key, pk = tr.dataset.pk;
     const fromSel = $('select.from', tr); if (fromSel) fromSel.onchange = e => { const r = rows.find(x => x.key === key); if (e.target.value === r.from) { state.actions = state.actions.filter(x => x.key !== key); delete (state.plan.moves || {})[key]; persist(); render(); } else upsertAction({ kind: 'switch', key, pk, acc: r.from, to: e.target.value, payee: r.payee, amount: r.planAmt }); render(); };
@@ -1599,6 +1620,7 @@ function payeeRegister() {
   return Object.values(g).map(r => { const ms = Object.keys(r.months).sort(); const bnpl = r.cat === 'Zilch / Clearpay'; return Object.assign(r, { monthsN: ms.length, latest: r.months[ms[ms.length - 1]], avg: r2(r.total / Math.max(1, ms.length)), day: dayOf(r.last.d), bank: r.kinds.has('DD') ? 'DD' : r.kinds.has('SO') ? 'SO' : bnpl ? 'BNPL' : (r.kinds.has('payment') ? 'Transfer' : 'Card'), inPlan: r.type === 'regular' && !r.action }); });
 }
 function setPayeeProps(r, props) {
+  state.reviewed = state.reviewed || {}; state.reviewed[r.pk] = true;
   // props: {cat,type,ess,exp,from,note,action,to}
   for (const id of r.ids) { const o = state.over[id] = Object.assign({}, state.over[id]); if (props.cat) o.c = props.cat; if (props.type) o.t = props.type; if (props.ess != null) o.ess = props.ess; if (props.exp != null) { o.exp = props.exp; if (props.from) o.from = props.from; } if (props.note != null) o.n = props.note; }
   if (props.cat) state.payeeCat[r.pk] = props.cat;
@@ -1612,9 +1634,12 @@ function setPayeeProps(r, props) {
   persist();
 }
 function renderReview(main) {
-  const f = view.reviewFilter = view.reviewFilter || { bank: 'all', type: 'all', acc: 'all' };
-  const all = payeeRegister();
+  const f = view.reviewFilter = view.reviewFilter || { bank: 'all', type: 'all', acc: 'all', status: 'todo', min: 0, seen: 'all' };
+  const all = payeeRegister().map(r => Object.assign(r, { reviewed: !!state.reviewed[r.pk] }));
   let rows = all.slice();
+  if (f.status === 'todo') rows = rows.filter(r => !r.reviewed); else if (f.status === 'done') rows = rows.filter(r => r.reviewed);
+  if (f.min > 0) rows = rows.filter(r => r.latest >= f.min);
+  if (f.seen === 'repeat') rows = rows.filter(r => r.monthsN >= 2 || r.bank === 'DD' || r.bank === 'SO'); else if (f.seen === 'once') rows = rows.filter(r => r.monthsN < 2 && r.bank !== 'DD' && r.bank !== 'SO');
   if (f.bank !== 'all') rows = rows.filter(r => r.bank === f.bank);
   if (f.type !== 'all') rows = rows.filter(r => r.type === f.type);
   if (f.acc !== 'all') rows = rows.filter(r => r.acc === f.acc);
@@ -1624,20 +1649,56 @@ function renderReview(main) {
   const planTotal = r2(all.filter(r => r.inPlan && r.bank !== 'BNPL').reduce((x, r) => x + r.latest, 0));
   main.innerHTML = `<div class="section">
     <div class="toolbar"><h1>Review payees</h1><div class="spacer"></div><span class="pill n num">${gbp(planTotal)} / month in next month's plan</span></div>
-    <div class="help">One line per payee across every account, grouped by how the bank takes it. Set the <b>Type</b> here and it applies to every transaction for that payee and to future statements: only <b>Regular</b> payees go into next month's planner. Use Action to cancel or switch, and Need to mark optional spend. Filters at the top narrow the list; the column boxes filter further.</div>
+    <div class="help">One line per payee across every account. Set the <b>Type</b> once and it applies to every transaction for that payee and to future statements: only <b>Regular</b> payees go into the planner. Anything you change is marked reviewed automatically and drops off the <b>To review</b> list, so the list only ever shows what is left. Use <b>Repeats monthly</b> to deal with the real subscriptions first, and <b>Hide under £</b> to skip the small stuff.</div>
+    <div class="toolbar">
+      <div class="chips" id="rvStatus"><button class="chip ${f.status === 'todo' ? 'on' : ''}" data-status="todo">To review (${all.filter(r => !r.reviewed).length})</button><button class="chip ${f.status === 'done' ? 'on' : ''}" data-status="done">Reviewed (${all.filter(r => r.reviewed).length})</button><button class="chip ${f.status === 'all' ? 'on' : ''}" data-status="all">All</button></div>
+      <div class="chips" id="rvSeen"><button class="chip ${f.seen === 'all' ? 'on' : ''}" data-seen="all">Any</button><button class="chip ${f.seen === 'repeat' ? 'on' : ''}" data-seen="repeat">Repeats monthly</button><button class="chip ${f.seen === 'once' ? 'on' : ''}" data-seen="once">Seen once</button></div>
+      <label class="small muted">Hide under £ <input type="number" id="rvMin" value="${f.min || ''}" placeholder="0" style="width:80px"></label>
+      <div class="spacer"></div>
+      <button class="btn sm ghost" id="rvDoneAll">Mark all shown as reviewed</button>
+    </div>
     <div class="chips" id="rvBank"><button class="chip ${f.bank === 'all' ? 'on' : ''}" data-bank="all">All (${all.length})</button><button class="chip ${f.bank === 'DD' ? 'on' : ''}" data-bank="DD">Direct debits (${cnt('DD')})</button><button class="chip ${f.bank === 'SO' ? 'on' : ''}" data-bank="SO">Standing orders (${cnt('SO')})</button><button class="chip ${f.bank === 'Transfer' ? 'on' : ''}" data-bank="Transfer">Bank transfers (${cnt('Transfer')})</button><button class="chip ${f.bank === 'Card' ? 'on' : ''}" data-bank="Card">Card payments (${cnt('Card')})</button><button class="chip ${f.bank === 'BNPL' ? 'on' : ''}" data-bank="BNPL">Zilch / Clearpay (${cnt('BNPL')})</button></div>
     <div class="chips" id="rvType"><button class="chip ${f.type === 'all' ? 'on' : ''}" data-type="all">Any type</button>${TYPES.map(x => `<button class="chip ${f.type === x[0] ? 'on' : ''}" data-type="${x[0]}">${x[1]} (${tcount(x[0])})</button>`).join('')}</div>
     <div class="chips" id="rvAcc"><button class="chip ${f.acc === 'all' ? 'on' : ''}" data-acc="all">All accounts</button>${allAccounts().filter(a => a.type !== 'manual').map(a => `<button class="chip ${f.acc === a.id ? 'on' : ''}" data-acc="${a.id}">${a.name}</button>`).join('')}</div>
-    <div class="card"><div class="tw"><table id="rvTable"><thead><tr><th>Payee</th><th>Account</th><th>Bank</th><th class="num">Latest</th><th class="num">Mths</th><th>Type</th><th>Plan</th><th>Category</th><th>Need</th><th>Exp.</th><th>Action</th><th>Note</th></tr></thead><tbody>
-      ${rows.map(r => `<tr data-key="${esc(r.key)}"><td><span class="payee">${esc(r.payee)}</span><div class="ref">${r.n} transaction${r.n > 1 ? 's' : ''} · last ${shortDate(r.last.d)}</div></td><td class="small">${esc(accName(r.acc))}</td><td><span class="pill ${r.bank === 'DD' || r.bank === 'SO' ? 'n' : r.bank === 'BNPL' ? 'warn' : 'good'}">${r.bank}</span></td><td class="num" data-v="${r.latest}"><b>${gbp(r.latest)}</b>${r.avg !== r.latest ? `<div class="ref">avg ${gbp(r.avg)}</div>` : ''}</td><td class="num">${r.monthsN}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === r.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td data-v="${r.inPlan ? 'yes' : 'no'}">${r.inPlan ? '<span class="pill good">Yes</span>' : r.action ? `<span class="pill bad">${r.action.kind === 'cancel' ? 'Cancelled' : 'Switch'}</span>` : '<span class="pill">No</span>'}</td><td>${catSelect('cat', r.cat)}</td><td><select class="ess"><option value="1" ${r.ess ? 'selected' : ''}>Essential</option><option value="0" ${r.ess ? '' : 'selected'}>Optional</option></select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${r.exp ? 'checked' : ''}> <select class="from" ${r.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === r.from ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td><select class="act"><option value="">${r.action ? '✓ ' + (r.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(r.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${r.action ? '<option value="clear">Undo action</option>' : ''}</select></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td></tr>`).join('')}
-      <tr class="total"><td colspan="3">Shown (${rows.length})</td><td class="num">${gbp(r2(rows.reduce((x, r) => x + r.latest, 0)))}</td><td colspan="8"></td></tr>
+    <div class="bulk" id="rvBulk"><label class="small"><input type="checkbox" class="selall"> Select all shown</label><span class="small muted sel-count">0 selected</span>
+      <select class="btyp"><option value="">Set type…</option>${TYPES.map(x => `<option value="${x[0]}">${x[1]}</option>`).join('')}</select>
+      <select class="bcat"><option value="">Set category…</option>${allCats().map(c => `<option>${c}</option>`).join('')}</select>
+      <select class="bess"><option value="">Set need…</option><option value="1">Essential</option><option value="0">Optional</option></select>
+      <select class="bexp"><option value="">Work expense…</option>${state.settings.claimFrom.map(c => `<option value="${esc(c)}">Yes – ${esc(c)}</option>`).join('')}<option value="__no__">No</option></select>
+      <select class="bact"><option value="">Action…</option><option value="cancel">Cancel from next month</option>${allAccounts().filter(a => a.type !== 'manual' && a.type !== 'credit').map(a => `<option value="switch:${a.id}">Switch to ${a.name}</option>`).join('')}<option value="clear">Undo action</option></select>
+      <select class="brev"><option value="">Reviewed…</option><option value="1">Mark reviewed</option><option value="0">Mark not reviewed</option></select>
+      <button class="btn sm bapply" disabled>Apply to selected</button></div>
+    <div class="card"><div class="tw"><table id="rvTable"><thead><tr><th><input type="checkbox" id="rvSelHead" title="Select all shown"></th><th>✓</th><th>Payee</th><th>Account</th><th>Bank</th><th class="num">Latest</th><th class="num">Mths</th><th>Type</th><th>Plan</th><th>Category</th><th>Need</th><th>Exp.</th><th>Action</th><th>Note</th></tr></thead><tbody>
+      ${rows.map(r => `<tr data-key="${esc(r.key)}"><td><input type="checkbox" class="pick"></td><td><input type="checkbox" class="done" ${r.reviewed ? 'checked' : ''} title="Reviewed"></td><td><span class="payee">${esc(r.payee)}</span><div class="ref">${r.n} transaction${r.n > 1 ? 's' : ''} · last ${shortDate(r.last.d)}</div></td><td class="small">${esc(accName(r.acc))}</td><td><span class="pill ${r.bank === 'DD' || r.bank === 'SO' ? 'n' : r.bank === 'BNPL' ? 'warn' : 'good'}">${r.bank}</span></td><td class="num" data-v="${r.latest}"><b>${gbp(r.latest)}</b>${r.avg !== r.latest ? `<div class="ref">avg ${gbp(r.avg)}</div>` : ''}</td><td class="num">${r.monthsN}</td><td><select class="typ">${TYPES.map(x => `<option value="${x[0]}" ${x[0] === r.type ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></td><td data-v="${r.inPlan ? 'yes' : 'no'}">${r.inPlan ? '<span class="pill good">Yes</span>' : r.action ? `<span class="pill bad">${r.action.kind === 'cancel' ? 'Cancelled' : 'Switch'}</span>` : '<span class="pill">No</span>'}</td><td>${catSelect('cat', r.cat)}</td><td><select class="ess"><option value="1" ${r.ess ? 'selected' : ''}>Essential</option><option value="0" ${r.ess ? '' : 'selected'}>Optional</option></select></td><td style="white-space:nowrap"><input class="exp" type="checkbox" ${r.exp ? 'checked' : ''}> <select class="from" ${r.exp ? '' : 'hidden'}>${state.settings.claimFrom.map(c => `<option ${c === r.from ? 'selected' : ''}>${c}</option>`).join('')}</select></td><td><select class="act"><option value="">${r.action ? '✓ ' + (r.action.kind === 'cancel' ? 'Cancelled' : 'Switch → ' + accName(r.action.to)) : 'Action…'}</option><option value="cancel">Cancel from next month</option><option value="switch">Switch account…</option>${r.action ? '<option value="clear">Undo action</option>' : ''}</select></td><td><input class="note" type="text" value="${esc(r.note || '')}" placeholder="what is this?"></td></tr>`).join('')}
+      <tr class="total"><td colspan="5">Shown (${rows.length})</td><td class="num">${gbp(r2(rows.reduce((x, r) => x + r.latest, 0)))}</td><td colspan="8"></td></tr>
     </tbody></table></div></div>
   </div>`;
+  { const bar = $('#rvBulk'); const picks = () => $$('#rvTable tr[data-key]:not([hidden]) input.pick'); const selected = () => picks().filter(c => c.checked).map(c => c.closest('tr').dataset.key);
+    const refresh = () => { const n = selected().length; $('.sel-count', bar).textContent = n + ' selected'; $('.bapply', bar).disabled = !n; };
+    const selAll = v => { picks().forEach(c => c.checked = v); refresh(); };
+    $('.selall', bar).onchange = e => selAll(e.target.checked); $('#rvSelHead').onchange = e => selAll(e.target.checked);
+    $('#rvTable').addEventListener('change', e => { if (e.target.classList.contains('pick')) refresh(); });
+    $('.bapply', bar).onclick = () => {
+      const keys = selected(); if (!keys.length) return;
+      const typ = $('.btyp', bar).value, cat = $('.bcat', bar).value, ess = $('.bess', bar).value, exp = $('.bexp', bar).value, act = $('.bact', bar).value, rev = $('.brev', bar).value;
+      if (!typ && !cat && !ess && !exp && !act && !rev) { toast('Choose what to set first'); return; }
+      for (const k of keys) { const r = all.find(x => x.key === k); if (!r) continue; const props = {};
+        if (typ) props.type = typ; if (cat && cat !== '__new__') props.cat = cat; if (ess) props.ess = ess === '1'; if (exp) { if (exp === '__no__') props.exp = false; else { props.exp = true; props.from = exp; } }
+        if (act === 'cancel') props.action = 'cancel'; else if (act.startsWith('switch:')) { props.action = 'switch'; props.to = act.slice(7); } else if (act === 'clear') props.action = 'clear';
+        if (Object.keys(props).length) setPayeeProps(r, props);
+        if (rev === '1') state.reviewed[r.pk] = true; else if (rev === '0') delete state.reviewed[r.pk]; }
+      persist(); render(); toast(`Updated ${keys.length} payee${keys.length > 1 ? 's' : ''}`); };
+  }
+  $$('#rvStatus .chip').forEach(b => b.onclick = () => { f.status = b.dataset.status; render(); });
+  $$('#rvSeen .chip').forEach(b => b.onclick = () => { f.seen = b.dataset.seen; render(); });
+  $('#rvMin').onchange = e => { f.min = +e.target.value || 0; render(); };
+  $('#rvDoneAll').onclick = () => { for (const r of rows) state.reviewed[r.pk] = true; persist(); render(); toast(`${rows.length} marked as reviewed`); };
   $$('#rvBank .chip').forEach(b => b.onclick = () => { f.bank = b.dataset.bank; render(); });
   $$('#rvType .chip').forEach(b => b.onclick = () => { f.type = b.dataset.type; render(); });
   $$('#rvAcc .chip').forEach(b => b.onclick = () => { f.acc = b.dataset.acc; render(); });
   $$('#rvTable tr[data-key]').forEach(tr => {
     const r = all.find(x => x.key === tr.dataset.key);
+    $('input.done', tr).onchange = e => { if (e.target.checked) state.reviewed[r.pk] = true; else delete state.reviewed[r.pk]; persist(); tr.hidden = f.status === 'todo' && e.target.checked; };
     $('select.typ', tr).onchange = e => { setPayeeProps(r, { type: e.target.value }); render(); toast(`${r.payee}: ${e.target.selectedOptions[0].text}`); };
     $('select.cat', tr).onchange = e => { if (e.target.value === '__new__') { newCategoryInline(e.target, c => { setPayeeProps(r, { cat: c }); render(); }); return; } setPayeeProps(r, { cat: e.target.value }); render(); };
     $('select.ess', tr).onchange = e => { setPayeeProps(r, { ess: e.target.value === '1' }); toast(e.target.value === '1' ? 'Essential' : 'Optional'); };
