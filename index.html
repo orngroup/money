@@ -175,6 +175,33 @@ details summary{cursor:pointer;font-weight:700;font-family:var(--display);paddin
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
 .kv b{font-weight:600;color:var(--muted)}
 .help{font-size:12px;color:var(--muted);line-height:1.5}
+/* current month columns */
+.cols{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+@media (max-width:1400px){.cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.acol{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--col);border-radius:12px;display:flex;flex-direction:column;min-width:0}
+.ahead{padding:10px 10px 8px;border-bottom:1px solid var(--line)}
+.aname{font-family:var(--display);font-weight:800;font-size:14px;color:var(--col)}
+.asub{font-size:11px;color:var(--muted)}
+.abal{font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+.aset{display:flex;gap:4px;margin-top:6px}.aset input{flex:1;min-width:0;padding:4px 6px;font-size:12px}
+.alist{flex:1;overflow:auto;max-height:640px}
+.amini{display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+.amenu{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1}
+.aedit{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 4px;background:var(--bg);border-radius:8px}
+.aedit[hidden]{display:none}
+.aedit input{width:80px;padding:3px 5px;font-size:12px}.aedit select{padding:3px 5px;font-size:12px;max-width:130px}
+.aitem{display:grid;grid-template-columns:22px 34px 1fr auto 18px;gap:4px;align-items:center;padding:5px 8px;border-bottom:1px solid var(--line);font-size:12px}
+.aitem.done{opacity:.5}.aitem.late{background:var(--bad-soft)}
+.aitem .alab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aitem .aday{color:var(--muted)}
+.aitem .aamt{white-space:nowrap;font-weight:600}
+.achk input{width:14px;height:14px}
+.xdel{border:0;background:none;color:var(--bad);cursor:pointer;font-size:13px;padding:0 3px}
+.afoot{padding:8px 10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:3px;font-size:13px}
+.afoot .aend{font-size:15px;margin-top:2px}
+.addform[hidden]{display:none}
+.addform{display:flex;flex-direction:column;gap:4px;margin-top:6px}.addform input,.addform select{padding:4px 6px;font-size:12px}
 @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -721,7 +748,7 @@ function ruleFor(tx) {
 
 /* ---------------- state ---------------- */
 const SEED = JSON.parse($('#seedData').textContent);
-const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, incomeThincDay: 4, incomeOneDay: 16, cardPayments: [{ id: 'cp1', card: 'zable', label: 'Zable card payment', amount: 250, day: 15, from: 'thinc' }, { id: 'cp2', card: 'capitalone', label: 'Capital One card payment', amount: 250, day: 21, from: 'thinc' }], draws: [{ id: 'd1', label: 'Salary – Ajay', from: 'thinc', to: 'ajay_hsbc', amount: 1047.5, day: 4 }, { id: 'd2', label: 'Salary – Louise', from: 'thinc', to: 'louise_hsbc', amount: 1047.5, day: 4 }, { id: 'd3', label: 'Dividend – Ajay', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }, { id: 'd4', label: 'Dividend – Louise', from: 'thinc', to: 'virgin_savings', amount: 900, day: 4 }], claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
+const DEFAULT_SETTINGS = { pin: '3131', vat: 700, rent: 4000, incomeThinc: 10000, incomeOneHolidays: 4200, startMonth: '2026-09', savingsBalance: 17000, incomeThincDay: 4, incomeOneDay: 16, cardPayments: [{ id: 'cp1', card: 'zable', label: 'Zable card payment', amount: 250, day: 15, from: 'thinc' }, { id: 'cp2', card: 'capitalone', label: 'Capital One card payment', amount: 250, day: 21, from: 'thinc' }], draws: [{ id: 'd1', label: 'Salary – Ajay', from: 'thinc', to: 'ajay_hsbc', amount: 1047.5, day: 4 }, { id: 'd2', label: 'Salary – Louise', from: 'thinc', to: 'louise_hsbc', amount: 1047.5, day: 4 }, { id: 'd3', label: 'Dividend – Ajay', from: 'thinc', to: 'louise_virgin', amount: 900, day: 4 }, { id: 'd4', label: 'Dividend – Louise', from: 'thinc', to: 'louise_virgin', amount: 900, day: 4 }], claimFrom: ['Brandon Hall Hotel & Spa', 'ORN Group', 'TAG', 'Other'] };
 const OPTIONAL_CATS = ['Beauty & Health', 'Clothing & Shopping', 'Eating Out & Takeaway', 'Lunch & Coffee', 'Entertainment', 'TV & Subscriptions', 'Gifts & Charity', 'Cash & Other'];
 const TYPES = [['regular', 'Regular'], ['everyday', 'Everyday'], ['oneoff', 'One-off'], ['unexpected', 'Unexpected']];
 let state = { v: 1, tx: {}, over: {}, payeeCat: {}, payeeNote: {}, notRecurring: {}, bills: [], customCats: [], plan: {}, settings: Object.assign({}, DEFAULT_SETTINGS), updatedAt: 0 };
@@ -732,7 +759,8 @@ function loadLocal() {
   try { const s = JSON.parse(localStorage.getItem('kawa.state') || 'null'); if (s && s.v === 1) state = Object.assign(state, s, { settings: Object.assign({}, DEFAULT_SETTINGS, s.settings || {}) }); } catch (e) { }
   try { session = JSON.parse(localStorage.getItem('kawa.session') || '{"user":null}'); } catch (e) { }
 }
-function ensureState() { state.manual = state.manual || []; state.balances = state.balances || {}; if (!state.balSeeded && SEED.balances) { for (const [k, v] of Object.entries(SEED.balances)) if (!state.balances[k]) state.balances[k] = Object.assign({}, v); state.balSeeded = true; } state.reviewed = state.reviewed || {}; state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); if (!state.settings.draws) state.settings.draws = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.draws)); if (!state.settings.cardPayments) state.settings.cardPayments = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.cardPayments)); state.bnpl = state.bnpl || []; if (!state.bnplSeeded && SEED.bnpl) { const have = new Set(state.bnpl.map(b => b.id)); for (const b of SEED.bnpl) if (!have.has(b.id)) state.bnpl.push(Object.assign({}, b)); state.bnplSeeded = true; } }
+function ensureState() { state.manual = state.manual || [];
+  if (!state.mig1) { for (const d of (state.settings.draws || [])) if (/dividend/i.test(d.label) && d.to === 'virgin_savings') d.to = 'louise_virgin'; const pm = (state.plan && state.plan.months) || {}; for (const m of Object.values(pm)) if (m.extras) m.extras = m.extras.filter(e => !/Sale of Louise's car|Backdated VAT bill/.test(e.payee)); state.mig1 = true; } state.balances = state.balances || {}; if (!state.balSeeded && SEED.balances) { for (const [k, v] of Object.entries(SEED.balances)) if (!state.balances[k]) state.balances[k] = Object.assign({}, v); state.balSeeded = true; } state.reviewed = state.reviewed || {}; state.actions = state.actions || []; state.goals = state.goals || []; state.payeeEss = state.payeeEss || {}; state.customAccounts = state.customAccounts || []; state.plan = state.plan || {}; state.customCats = state.customCats || []; state.bills = state.bills || []; state.payeeType = state.payeeType || {}; state.payeeExp = state.payeeExp || {}; state.claims = state.claims || []; if (!state.settings.claimFrom) state.settings.claimFrom = DEFAULT_SETTINGS.claimFrom.slice(); if (!state.settings.draws) state.settings.draws = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.draws)); if (!state.settings.cardPayments) state.settings.cardPayments = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.cardPayments)); state.bnpl = state.bnpl || []; if (!state.bnplSeeded && SEED.bnpl) { const have = new Set(state.bnpl.map(b => b.id)); for (const b of SEED.bnpl) if (!have.has(b.id)) state.bnpl.push(Object.assign({}, b)); state.bnplSeeded = true; } }
 function saveLocal() { try { localStorage.setItem('kawa.state', JSON.stringify(state)); } catch (e) { } }
 function persist() {
   state.updatedAt = Date.now();
@@ -881,10 +909,11 @@ function insights(ym) {
 }
 
 /* ---------------- rendering ---------------- */
-let view = { page: 'now', month: null, acc: 'thinc', filter: { acc: 'all', cat: 'all', q: '', month: 'all' } };
+let view = { page: 'month', month: null, acc: 'thinc', filter: { acc: 'all', cat: 'all', q: '', month: 'all' } };
 const charts = {};
 const NAV = [
-  ['now', 'Household', 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'],
+  ['month', 'Current month', 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'],
+  ['now', 'Position (detail)', 'M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
   ['home', 'Overview', 'M4 19V5m0 14h16M8 15l4-5 3 3 5-7'],
   ['accounts', 'Accounts', 'M3 6h18v12H3zM3 10h18M7 14h4'],
   ['review', 'Review', 'M4 6h16M4 12h16M4 18h10M18 16l2 2 4-4'],
@@ -899,9 +928,14 @@ const NAV = [
   ['settings', 'Settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.5a7 7 0 0 0-1.7 1L5.1 5.6l-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5c.1-.3.1-.7.1-1z'],
 ];
 const icon = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+const PRIMARY = ['month', 'accounts', 'tx', 'bnpl', 'exp', 'upload', 'settings'];
 function renderNav() {
-  const html = NAV.map(n => `<button data-page="${n[0]}" class="${view.page === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[1]}</span></button>`).join('');
-  $('#sideNav').innerHTML = html; $('#bottomNav').innerHTML = html;
+  const prim = NAV.filter(n => PRIMARY.includes(n[0])); const more = NAV.filter(n => !PRIMARY.includes(n[0]));
+  const btn = n => `<button data-page="${n[0]}" class="${view.page === n[0] ? 'on' : ''}">${icon(n[2])}<span>${n[1]}</span></button>`;
+  const open = view.moreOpen || more.some(n => n[0] === view.page);
+  $('#sideNav').innerHTML = prim.map(btn).join('') + `<button data-more="1" class="${open ? '' : ''}" style="opacity:.7">${icon('M6 9l6 6 6-6')}<span>More${open ? '' : '…'}</span></button>` + (open ? more.map(btn).join('') : '');
+  $('#bottomNav').innerHTML = prim.map(btn).join('') + more.map(btn).join('');
+  $$('[data-more]').forEach(b => b.onclick = () => { view.moreOpen = !open; renderNav(); });
   $$('#sideNav button, #bottomNav button').forEach(b => b.onclick = () => { view.page = b.dataset.page; render(); window.scrollTo(0, 0); });
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -940,7 +974,7 @@ function render() {
   const ms = months(); if (!view.month || !ms.includes(view.month)) view.month = ms.includes(todayISO().slice(0, 7)) ? todayISO().slice(0, 7) : ms[ms.length - 1];
   destroyCharts(); chartDefaults();
   const main = $('#main');
-  ({ home: renderHome, now: renderNow, accounts: renderAccounts, fixed: renderFixed, review: renderReview, set: renderSet, plan: renderPlan, bnpl: renderBnpl, actions: renderActions, savings: renderSavings, tx: renderTx, exp: renderExpenses, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
+  ({ home: renderHome, now: renderNow, month: renderMonth, accounts: renderAccounts, fixed: renderFixed, review: renderReview, set: renderSet, plan: renderPlan, bnpl: renderBnpl, actions: renderActions, savings: renderSavings, tx: renderTx, exp: renderExpenses, upload: renderUpload, settings: renderSettings }[view.page] || renderHome)(main);
   enhanceTables(main);
   $('#whoName').textContent = session.user || '';
 }
@@ -1271,7 +1305,7 @@ function setPayments() {
   const rows = fixedRegister().map(r => Object.assign({}, r, { type: r.kind === 'DD' ? 'DD' : r.kind === 'SO' ? 'SO' : r.virtual ? 'Set-aside' : 'Subscription', from: r.acc, to: null }));
   for (const d of draws()) rows.push({ key: 'draw|' + d.id, pk: 'DRAW ' + d.id, acc: d.from, from: d.from, to: d.to, payee: d.label, cat: 'Pay to ourselves', kind: 'payment', type: 'Transfer', months: {}, day: d.day || 4, amount: d.amount, kindLabel: 'Pay ourselves', note: 'Set in Settings → Pay ourselves', confirmed: true, locked: true });
   for (const cp of (state.settings.cardPayments || []).filter(c => c.on !== false)) { const a = ACC[cp.card]; const cov = SEED.coverage.filter(c => c.account === cp.card); const latest = cov[cov.length - 1]; rows.push({ key: 'card|' + cp.id, pk: 'CARD ' + cp.id, acc: cp.from, from: cp.from, to: cp.card, payee: cp.label || ((a ? a.name : cp.card) + ' payment'), cat: 'Credit Card Payment', kind: 'payment', type: 'Card payment', months: {}, day: cp.day || 15, amount: cp.amount, kindLabel: 'Card payment', confirmed: true, locked: true, note: latest && latest.summary.minPayment ? `minimum ${gbp(latest.summary.minPayment)}${latest.summary.closing != null ? ' · balance ' + gbp(latest.summary.closing) : ''} · set in Settings → Card payments` : 'Set in Settings → Card payments' }); }
-  for (const r of rows) { const act = (state.actions || []).find(x => x.key === r.key); r.action = act || null; r.planAcc = act && act.kind === 'switch' ? act.to : ((state.plan.moves || {})[r.key] || r.from); r.planAmt = (state.plan.amt || {})[r.key] != null ? state.plan.amt[r.key] : r.amount; const sk = (state.plan.skip || {})[r.key]; r.skip = act && act.kind === 'cancel' ? true : (sk != null ? !!sk : !r.confirmed); }
+  for (const r of rows) { if ((state.plan.day || {})[r.key]) r.day = state.plan.day[r.key]; const act = (state.actions || []).find(x => x.key === r.key); r.action = act || null; r.planAcc = act && act.kind === 'switch' ? act.to : ((state.plan.moves || {})[r.key] || r.from); r.planAmt = (state.plan.amt || {})[r.key] != null ? state.plan.amt[r.key] : r.amount; const sk = (state.plan.skip || {})[r.key]; r.skip = act && act.kind === 'cancel' ? true : (sk != null ? !!sk : !r.confirmed); }
   return rows.filter(r => !(state.plan.hidden || {})[r.key]).sort((a, b) => a.day - b.day || b.amount - a.amount);
 }
 function renderSet(main) {
@@ -1325,7 +1359,7 @@ function renderSet(main) {
   });
 }
 /* forecast for a future month */
-function planFor(ym) { state.plan.months = state.plan.months || {}; if (!state.plan.months[ym]) { state.plan.months[ym] = { income: {}, allow: {}, bnpl: {}, opening: {}, extras: [] }; if (ym === '2026-11') state.plan.months[ym].extras.push({ payee: "Sale of Louise's car (expected)", amount: 8000, acc: 'virgin_savings', kind: 'income', day: null }, { payee: 'Backdated VAT bill (approx.)', amount: 6500, acc: 'virgin_savings', kind: 'cost', day: null }); } return state.plan.months[ym]; }
+function planFor(ym) { state.plan.months = state.plan.months || {}; if (!state.plan.months[ym]) { state.plan.months[ym] = { income: {}, allow: {}, bnpl: {}, opening: {}, extras: [] };  } return state.plan.months[ym]; }
 function draws() { return (state.settings.draws || []).filter(d => d.on !== false); }
 function forecast(ym) {
   const pl = planFor(ym); const bm = baseMonth(); const base = summary(bm);
@@ -1369,12 +1403,12 @@ function cashflow(ym, fc) {
   const ev = [];
   for (const o of fc.accounts) {
     if (o.income) ev.push({ day: o.a.id === 'thinc' ? (state.settings.incomeThincDay || 4) : o.a.id === 'oneholidays' ? (state.settings.incomeOneDay || 16) : 1, acc: o.a.id, label: o.a.id === 'thinc' ? 'ORN income' : o.a.id === 'oneholidays' ? 'Itravelmix income' : 'Income', amt: o.income, kind: 'income' });
-    for (const r of o.fixedRows) ev.push({ day: Math.min(daysIn, r.day || 1), acc: o.a.id, label: r.payee, amt: -r.planAmt, kind: r.type });
+    for (const r of o.fixedRows) ev.push({ day: Math.min(daysIn, r.day || 1), acc: o.a.id, label: r.payee, amt: -r.planAmt, kind: r.type, setKey: r.key, pk: r.pk, locked: !!r.locked });
   }
-  for (const b of (state.bnpl || []).filter(b => monthOf(b.date) === ym && !b.paid)) ev.push({ day: dayOf(b.date), acc: b.acc, label: `${b.provider}: ${b.desc || 'instalment'}`, amt: -b.amount, kind: 'instalment' });
-  for (const d of draws()) { ev.push({ day: d.day || 4, acc: d.from, label: d.label, amt: -d.amount, kind: 'Pay ourselves' }); ev.push({ day: d.day || 4, acc: d.to, label: d.label, amt: d.amount, kind: 'Pay ourselves' }); }
-  if (fc.oh && fc.oh.topUp) { const rent = fc.oh.rows.find(r => /THINC DIGITAL/i.test(r.payee)); const day = rent ? rent.day : 4; ev.push({ day, acc: 'thinc', label: 'Top-up to One Holidays', amt: -fc.oh.topUp, kind: 'top-up' }); ev.push({ day, acc: 'oneholidays', label: 'Top-up from Thinc', amt: fc.oh.topUp, kind: 'top-up' }); }
-  for (const e of pl.extras) ev.push({ day: e.day || 1, acc: e.acc, label: e.payee, amt: e.kind === 'income' ? e.amount : -e.amount, kind: 'extra' });
+  for (const b of (state.bnpl || []).filter(b => monthOf(b.date) === ym && !b.paid)) ev.push({ day: dayOf(b.date), acc: b.acc, label: `${b.provider}: ${b.desc || 'instalment'}`, amt: -b.amount, kind: 'instalment', bnplId: b.id });
+  for (const d of draws()) { ev.push({ day: d.day || 4, acc: d.from, label: d.label, amt: -d.amount, kind: 'Pay ourselves', drawId: d.id }); ev.push({ day: d.day || 4, acc: d.to, label: d.label, amt: d.amount, kind: 'Pay ourselves', drawId: d.id }); }
+
+  pl.extras.forEach((e, i) => ev.push({ day: e.day || 1, acc: e.acc, label: e.payee, amt: e.kind === 'income' ? e.amount : -e.amount, kind: 'extra', extraIdx: i }));
   for (const g of goalMonthly()) if (g.monthly) { const goal = state.goals.find(x => x.id === g.id); ev.push({ day: 25, acc: g.acc, label: 'Savings: ' + (goal ? goal.name : ''), amt: -g.monthly, kind: 'savings' }); }
   // spread BNPL estimate evenly across the month
   const out = [];
@@ -1780,7 +1814,7 @@ function monthSchedule(ym) {
     const ov = (state.plan.paid || {})[key];
     const paid = ov != null ? ov : !!hit;
     const due = ym + '-' + String(e.day).padStart(2, '0');
-    items.push({ key, acc: e.acc, day: e.day, due, label: e.label, kind: e.kind, amt: e.amt, paid, hit, overdue: !paid && due < todayD });
+    items.push(Object.assign({ key, acc: e.acc, day: e.day, due, label: e.label, kind: e.kind, amt: e.amt, paid, hit, overdue: !paid && due < todayD }, { setKey: e.setKey, pk: e.pk, locked: e.locked, bnplId: e.bnplId, drawId: e.drawId, extraIdx: e.extraIdx }));
   }
   return { items, fc };
 }
@@ -1841,6 +1875,86 @@ function renderNow(main) {
   $$('[data-mdel]').forEach(b => b.onclick = () => { state.manual = state.manual.filter(m => m.id !== b.dataset.mdel); persist(); render(); });
   $$('tr[data-bal]').forEach(tr => { const acc = tr.dataset.bal; const save = () => { const v = $('input.bamt', tr).value; if (v === '') { delete state.balances[acc]; } else state.balances[acc] = { amount: +v, asOf: $('input.bdate', tr).value || todayD }; persist(); render(); toast('Balance saved'); }; $('input.bamt', tr).onchange = save; $('input.bdate', tr).onchange = save; });
   $$('#schedTable tr[data-skey]').forEach(tr => { $('input.spaid', tr).onchange = e => { state.plan.paid = state.plan.paid || {}; state.plan.paid[tr.dataset.skey] = e.target.checked; persist(); render(); }; });
+}
+
+/* ---------------- Current month: columns per account ---------------- */
+const COL_ACCS = ['thinc', 'oneholidays', 'ajay_hsbc', 'louise_hsbc', 'louise_virgin', 'virgin_savings'];
+const COL_COLOR = { thinc: 'c1', oneholidays: 'c2', ajay_hsbc: 'c3', louise_hsbc: 'c4', louise_virgin: 'c6', virgin_savings: 'c9' };
+function renderMonth(main) {
+  const cur = todayISO().slice(0, 7); const todayD = todayISO();
+  const opts = [0, 1, 2, 3].map(n => addMonths(cur, n)); if (!view.monthYm || !opts.includes(view.monthYm)) view.monthYm = cur;
+  const ym = view.monthYm; const { items } = monthSchedule(ym);
+  const inMonth = allTx().filter(t => t.m === ym);
+  const col = acc => {
+    const sched = items.filter(i => i.acc === acc);
+    // manual transactions this month not already matched to a scheduled item
+    const matchedIds = new Set(sched.filter(i => i.hit).map(i => i.hit.id));
+    const extraTx = inMonth.filter(t => t.a === acc && t.manual && !matchedIds.has(t.id)).map(t => ({ key: 'tx|' + t.id, acc, day: dayOf(t.d), due: t.d, label: t.p + (t.r ? ' · ' + t.r : ''), kind: 'added', amt: t.v, paid: true, hit: t, manualId: t.id }));
+    const rows = sched.concat(extraTx).sort((a, b) => a.day - b.day || b.amt - a.amt);
+    const now = balanceOf(acc); const pendOut = r2(-rows.filter(r => !r.paid && r.amt < 0).reduce((x, r) => x + r.amt, 0)); const pendIn = r2(rows.filter(r => !r.paid && r.amt > 0).reduce((x, r) => x + r.amt, 0));
+    return { acc, rows, now, pendOut, pendIn, end: r2(now - pendOut + pendIn) };
+  };
+  const cols = COL_ACCS.map(col);
+  const tot = k => r2(cols.reduce((x, c) => x + c[k], 0));
+  const vat = r2(items.filter(i => /VAT/i.test(i.label)).reduce((x, i) => x - i.amt, 0));
+  const cards = allAccounts().filter(a => a.type === 'credit').map(a => ({ a, bal: balanceOf(a.id) }));
+  main.innerHTML = `<div class="section">
+    <div class="toolbar"><h1>${monthLabel(ym)}</h1><div class="spacer"></div><label class="small muted">Month ${monthSelect('cmMonth', ym, opts)}</label><span class="small muted">today ${shortDate(todayD)}</span></div>
+    <div class="grid g4 tiles">
+      <div class="tile hero"><div class="lbl">Family cash today</div><div class="val num">${gbp(tot('now'))}</div><div class="sub">all six accounts</div></div>
+      <div class="tile ${tot('end') < 0 ? 'hero neg' : ''}"><div class="lbl">End of month</div><div class="val num">${gbp(tot('end'))}</div><div class="sub">after everything listed below</div></div>
+      <div class="tile"><div class="lbl">Still to go out</div><div class="val num">${gbp(tot('pendOut'))}</div><div class="sub">${items.filter(i => !i.paid && i.amt < 0).length} payments</div></div>
+      <div class="tile"><div class="lbl">Still to come in</div><div class="val num pos">${gbp(tot('pendIn'))}</div><div class="sub">income and transfers in</div></div>
+      <div class="tile"><div class="lbl">VAT to set aside</div><div class="val num">${gbp(vat)}</div><div class="sub">this month (One Holidays)</div></div>
+      <div class="tile"><div class="lbl">Cards owed</div><div class="val num">${gbp(r2(-cards.reduce((x, c) => x + c.bal, 0)))}</div><div class="sub">${cards.map(c => esc(c.a.name) + ' ' + gbp(-c.bal, { dp: 0 })).join(' · ')}</div></div>
+      <div class="tile"><div class="lbl">Paid so far</div><div class="val num">${gbp(r2(-items.filter(i => i.paid && i.amt < 0).reduce((x, i) => x + i.amt, 0)))}</div><div class="sub">${items.filter(i => i.paid && i.amt < 0).length} of ${items.filter(i => i.amt < 0).length} payments done</div></div>
+      <div class="tile"><div class="lbl">Received so far</div><div class="val num pos">${gbp(r2(items.filter(i => i.paid && i.amt > 0).reduce((x, i) => x + i.amt, 0)))}</div><div class="sub">income in</div></div>
+    </div>
+    <div class="help">Type the balance from the banking app into an account header and press Set to re-align it as of today. Tick a line when it has gone out (lines tick themselves when a matching transaction is uploaded or added). The <b>⋯</b> on each line lets you set it as Regular, One-off or Unexpected, change the amount or day, or remove it. <b>+ Add</b> records a transfer, a payment or money in; a transfer appears in both columns.</div>
+    <div class="cols">${cols.map(c => { const a = ACC[c.acc]; const color = `var(--${COL_COLOR[c.acc]})`; return `
+      <div class="acol" data-acc="${c.acc}" style="--col:${color}">
+        <div class="ahead"><div class="aname">${esc(a.name)}</div><div class="asub">${a.bank}${a.last4 ? ' •••• ' + a.last4 : ''}</div>
+          <div class="abal num ${c.now < 0 ? 'neg' : ''}">${gbp(c.now)}</div>
+          <div class="amini"><span>out <b class="num">${gbp(c.pendOut, { dp: 0 })}</b></span><span>in <b class="num pos">${gbp(c.pendIn, { dp: 0 })}</b></span><span>end <b class="num ${c.end < 0 ? 'neg' : ''}">${gbp(c.end, { dp: 0 })}</b></span></div>
+          <div class="aset"><input class="settoday" type="number" step="0.01" placeholder="balance today"><button class="btn sm setbtn">Set</button></div></div>
+        <div class="alist">${c.rows.length ? c.rows.map(r => `<div class="aitem ${r.paid ? 'done' : ''} ${r.overdue ? 'late' : ''}" data-skey="${esc(r.key)}"><label class="achk"><input type="checkbox" class="spaid" ${r.paid ? 'checked' : ''} ${r.manualId ? 'disabled' : ''}></label><div class="aday num">${ordinal(r.day)}</div><div class="alab" title="${esc(r.label)}">${esc(r.label)}${r.manualId ? ` <button class="xdel" data-mdel="${r.manualId.replace(/_[io]$/, '')}" title="Remove">×</button>` : ''}</div><div class="aamt num ${r.amt > 0 ? 'pos' : ''}">${gbp(r.amt, { sign: true })}</div><button class="amenu" title="Edit">⋯</button>
+          <div class="aedit" hidden>${r.manualId ? `<div class="small muted">Added by hand</div>` : r.setKey && !r.locked ? `<label class="small">Type <select class="etype">${TYPES.map(x => `<option value="${x[0]}">${x[1]}</option>`).join('')}</select></label><label class="small">Amount <input class="eamt" type="number" step="0.01" value="${Math.abs(r.amt)}"></label><label class="small">Day <input class="eday" type="number" min="1" max="31" value="${r.day}"></label><label class="small">Paid from <select class="efrom">${COL_ACCS.map(x => `<option value="${x}" ${x === r.acc ? 'selected' : ''}>${accName(x)}</option>`).join('')}</select></label><button class="btn sm" data-act="save">Save</button><button class="btn sm ghost" data-act="skip">Not this month</button><button class="btn sm danger" data-act="remove">Remove for good</button>` : r.bnplId ? `<label class="small">Amount <input class="eamt" type="number" step="0.01" value="${Math.abs(r.amt)}"></label><button class="btn sm" data-act="bnplsave">Save</button><button class="btn sm danger" data-act="bnpldel">Remove</button>` : r.drawId ? `<label class="small">Amount <input class="eamt" type="number" step="0.01" value="${Math.abs(r.amt)}"></label><label class="small">Day <input class="eday" type="number" min="1" max="31" value="${r.day}"></label><button class="btn sm" data-act="drawsave">Save</button><button class="btn sm danger" data-act="drawoff">Switch off</button>` : r.extraIdx != null ? `<button class="btn sm danger" data-act="extradel">Remove</button>` : r.locked ? `<div class="small muted">Set in Settings → Card payments</div>` : `<div class="small muted">${r.kind === 'income' ? 'Income amount and day are in Settings' : 'Nothing to edit'}</div>`}</div></div>`).join('') : '<div class="small muted" style="padding:8px">Nothing scheduled</div>'}</div>
+        <div class="afoot"><div class="num"><span class="muted small">out</span> ${gbp(c.pendOut)}</div><div class="num pos"><span class="muted small">in</span> ${gbp(c.pendIn)}</div><div class="aend num ${c.end < 0 ? 'neg' : ''}"><span class="muted small">closing</span> <b>${gbp(c.end)}</b></div>
+          <button class="btn sm ghost addbtn">+ Add</button>
+          <form class="addform" hidden><select class="fk"><option value="spend">Payment out</option><option value="transfer">Transfer to…</option><option value="income">Money in</option></select><select class="fto">${COL_ACCS.filter(x => x !== c.acc).map(x => `<option value="${x}">${accName(x)}</option>`).join('')}</select><input class="fd" type="date" value="${ym === cur ? todayD : ym + '-01'}" required><input class="fa" type="number" step="0.01" min="0" placeholder="£" required><input class="fdesc" type="text" placeholder="What is it?"><button class="btn sm" type="submit">Save</button></form></div>
+      </div>`; }).join('')}</div>
+  </div>`;
+  $('#cmMonth').onchange = e => { view.monthYm = e.target.value; render(); };
+  $$('.acol').forEach(colEl => {
+    const acc = colEl.dataset.acc;
+    const inp = $('input.settoday', colEl); const doSet = () => { if (inp.value === '') return; state.balances[acc] = { amount: +inp.value, asOf: todayD }; persist(); render(); toast(accName(acc) + ' set to ' + gbp(+inp.value)); };
+    $('button.setbtn', colEl).onclick = doSet; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); doSet(); } };
+    $$('.aitem', colEl).forEach(it => { const cb = $('input.spaid', it); if (cb && !cb.disabled) cb.onchange = e => { state.plan.paid = state.plan.paid || {}; state.plan.paid[it.dataset.skey] = e.target.checked; persist(); render(); };
+      const item = items.concat(cols.flatMap(c => c.rows)).find(x => x.key === it.dataset.skey); const ed = $('.aedit', it); const mb = $('button.amenu', it);
+      mb.onclick = () => { ed.hidden = !ed.hidden; };
+      $$('[data-act]', ed).forEach(b => b.onclick = () => {
+        const act = b.dataset.act;
+        if (act === 'save') { const r = setPayments().find(x => x.key === item.setKey); if (!r) return; const typ = $('select.etype', ed).value; const amt = +$('input.eamt', ed).value; const day = +$('input.eday', ed).value; const from = $('select.efrom', ed).value;
+          state.plan.amt = state.plan.amt || {}; if (amt > 0) state.plan.amt[item.setKey] = amt; state.plan.day = state.plan.day || {}; if (day) state.plan.day[item.setKey] = day;
+          if (from !== r.from) upsertAction({ kind: 'switch', key: item.setKey, pk: r.pk, acc: r.from, to: from, payee: r.payee, amount: amt }); else state.actions = state.actions.filter(x => !(x.key === item.setKey && x.kind === 'switch'));
+          if (typ !== 'regular') { state.payeeType[r.pk] = typ; state.notRecurring[r.pk] = true; state.plan.skip = state.plan.skip || {}; state.plan.skip[item.setKey] = true; } else { state.payeeType[r.pk] = 'regular'; delete state.notRecurring[r.pk]; state.plan.skip = state.plan.skip || {}; state.plan.skip[item.setKey] = false; }
+          state.reviewed[r.pk] = true; persist(); render(); toast('Saved'); }
+        else if (act === 'skip') { state.plan.skip = state.plan.skip || {}; state.plan.skip[item.setKey] = true; persist(); render(); toast('Taken out of this month'); }
+        else if (act === 'remove') { state.plan.hidden = state.plan.hidden || {}; state.plan.hidden[item.setKey] = true; if (item.pk) { state.notRecurring[item.pk] = true; state.payeeType[item.pk] = 'oneoff'; } persist(); render(); toast('Removed from the schedule'); }
+        else if (act === 'bnplsave') { const bn = state.bnpl.find(x => x.id === item.bnplId); if (bn) bn.amount = +$('input.eamt', ed).value || bn.amount; persist(); render(); }
+        else if (act === 'bnpldel') { state.bnpl = state.bnpl.filter(x => x.id !== item.bnplId); persist(); render(); }
+        else if (act === 'drawsave') { const d = state.settings.draws.find(x => x.id === item.drawId); if (d) { d.amount = +$('input.eamt', ed).value || d.amount; d.day = +$('input.eday', ed).value || d.day; } persist(); render(); }
+        else if (act === 'drawoff') { const d = state.settings.draws.find(x => x.id === item.drawId); if (d) d.on = false; persist(); render(); }
+        else if (act === 'extradel') { planFor(ym).extras.splice(item.extraIdx, 1); persist(); render(); }
+      });
+      const typeSel = $('select.etype', ed); if (typeSel && item.pk) typeSel.value = (state.payeeType[item.pk] || 'regular');
+    });
+    $$('[data-mdel]', colEl).forEach(b => b.onclick = () => { state.manual = state.manual.filter(m => m.id !== b.dataset.mdel); persist(); render(); });
+    const form = $('form.addform', colEl); const fk = $('select.fk', form); const fto = $('select.fto', form);
+    const sync = () => { fto.hidden = fk.value !== 'transfer'; }; fk.onchange = sync; sync();
+    $('button.addbtn', colEl).onclick = () => { form.hidden = !form.hidden; if (!form.hidden) $('input.fa', form).focus(); };
+    form.onsubmit = e => { e.preventDefault(); const k = fk.value; const m = { id: 'm' + Date.now().toString(36), kind: k, date: $('input.fd', form).value, amount: +$('input.fa', form).value || 0, desc: $('input.fdesc', form).value.trim() }; if (k === 'transfer') { m.from = acc; m.to = fto.value; m.desc = m.desc || 'Transfer to ' + accName(m.to); } else if (k === 'income') { m.to = acc; m.desc = m.desc || 'Money in'; } else { m.from = acc; m.cat = 'Cash & Other'; m.desc = m.desc || 'Payment'; } state.manual.push(m); persist(); render(); toast('Added'); };
+  });
 }
 
 /* ---- SETTINGS ---- */
