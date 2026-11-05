@@ -1803,8 +1803,15 @@ function renderBnpl(main) {
 
 /* ---------------- this month: live balances, scheduled payments, manual transactions ---------------- */
 function balanceOf(acc, upTo) {
-  const b = state.balances[acc]; const asOf = b ? b.asOf : '1900-01-01'; const start = b ? b.amount : 0;
-  const tx = allTx().filter(t => t.a === acc && t.d > asOf && (!upTo || t.d <= upTo));
+  const b = state.balances[acc]; const asOf = b ? b.asOf : '1900-01-01'; const setAt = b ? (b.setAt || 0) : 0; const start = b ? b.amount : 0;
+  const tx = allTx().filter(t => {
+    if (t.a !== acc) return false;
+    if (upTo && t.d > upTo) return false;
+    if (t.d > asOf) return true;
+    // on or before the asOf date: include manual transactions added after we set the balance
+    if (t.manual && (t.createdAt || Infinity) > setAt) return true;
+    return false;
+  });
   return r2(start + tx.reduce((x, t) => x + t.v, 0));
 }
 function monthSchedule(ym) {
