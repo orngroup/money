@@ -1313,6 +1313,49 @@ async function handleFiles(files) {
   toast('Statements processed');
   setTimeout(render, 1500);
 }
+async function handleAccountUpload(acc, files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  try {
+    let res;
+    if (/\.pdf$/i.test(file.name)) res = await parsePdfFile(file);
+    else res = parseCsvText(await file.text(), acc);
+    const parsedAcc = res.account || acc;
+    if (parsedAcc && parsedAcc !== acc) {
+      if (!confirm(`This PDF looks like a ${accName(parsedAcc)} statement, not ${accName(acc)}. Load it anyway for ${accName(acc)}?`)) {
+        // Fall back to its own account
+        for (const t of res.transactions) t.account = parsedAcc;
+      } else {
+        for (const t of res.transactions) t.account = acc;
+      }
+    } else {
+      for (const t of res.transactions) t.account = acc;
+    }
+    const existing = new Set(allTx().map(t => t.id));
+    const have = {}; for (const t of allTx().filter(t => !t.manual)) { const k = txKey(t); have[k] = (have[k] || 0) + 1; }
+    const seen = {}; let added = 0; const groups = {}; let lastBal = null, lastDate = null;
+    for (const t of res.transactions) {
+      const key = [t.account, t.date, t.payee, t.amount].join('|'); seen[key] = (seen[key] || 0) + 1;
+      const id = hash12(key + '#' + seen[key]);
+      if (existing.has(id)) continue;
+      const dk = [t.account, t.date, Math.round(t.amount * 100)].join('|'); if (have[dk] > 0) { have[dk]--; continue; }
+      const row = { id, a: t.account, d: t.date, p: t.payee, v: t.amount, k: t.kind };
+      const ref = [t.ref, t.bank].filter(Boolean).join(' · '); if (ref && ref !== t.payee) row.r = ref;
+      if (t.balance != null) { row.b = t.balance; if (lastDate == null || t.date >= lastDate) { lastDate = t.date; lastBal = t.balance; } }
+      state.tx[id] = row; existing.add(id); added++;
+      const gk = t.account + '_' + t.date.slice(0, 7); (groups[gk] = groups[gk] || []).push(row);
+    }
+    // Statement running balance → update account balance if we have one
+    const summary = res.summary || {};
+    const stmtBal = summary.closing != null ? summary.closing : lastBal;
+    if (stmtBal != null) { state.balances[acc] = { amount: stmtBal, asOf: lastDate || todayISO(), setAt: Date.now() }; }
+    persist(); persistUploads(groups);
+    toast(`${accName(acc)}: ${added} new transactions${stmtBal != null ? ', balance ' + gbp(stmtBal) : ''}`);
+    render();
+  } catch (e) {
+    toast('Could not read ' + file.name + ': ' + (e.message || e));
+  }
+}
 async function parsePdfFile(file) {
   const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -1953,7 +1996,7 @@ function renderMonth(main) {
     const actualLines = unmatched.filter(t => t.group === 'transfer' || t.group === 'income' || t.recurring).map(t => ({ key: 'act|' + t.id, acc, day: dayOf(t.d), due: t.d, label: t.p + (t.r ? ' · ' + t.r : ''), kind: t.group === 'transfer' ? 'transfer' : t.group === 'income' ? 'income' : 'actual', amt: t.v, paid: true, hit: t, actualId: t.id, pk: t.pk }));
     const other = unmatched.filter(t => !(t.group === 'transfer' || t.group === 'income' || t.recurring));
     const otherOut = r2(-other.filter(t => t.v < 0).reduce((x, t) => x + t.v, 0)), otherIn = r2(other.filter(t => t.v > 0).reduce((x, t) => x + t.v, 0));
-    const rows = sched.concat(extraTx, actualLines).sort((a, b) => a.day - b.day || b.amt - a.amt);
+    const rows = sched.concat(extraTx, actualLines).sort((a, b) => b.day - a.day || b.amt - a.amt);
     const now = balanceOf(acc); const pendOut = r2(-rows.filter(r => !r.paid && r.amt < 0).reduce((x, r) => x + r.amt, 0)); const pendIn = r2(rows.filter(r => !r.paid && r.amt > 0).reduce((x, r) => x + r.amt, 0));
     return { acc, rows, now, pendOut, pendIn, end: r2(now - pendOut + pendIn), other, otherOut, otherIn };
   };
@@ -1980,7 +2023,8 @@ function renderMonth(main) {
           <div class="abal num ${c.now < 0 ? 'neg' : ''}">${gbp(c.now)}<span class="abl">today</span></div>
           <div class="abal num ${c.end < 0 ? 'neg' : 'pos'}" style="font-size:18px">${gbp(c.end)}<span class="abl">after this month</span></div>
           <div class="amini"><span>out <b class="num">${gbp(c.pendOut, { dp: 0 })}</b></span><span>in <b class="num pos">${gbp(c.pendIn, { dp: 0 })}</b></span></div>
-          <div class="aset"><input class="settoday" type="number" step="0.01" placeholder="balance today"><button class="btn sm setbtn">Set</button></div></div>
+          <div class="aset"><input class="settoday" type="number" step="0.01" placeholder="balance today"><button class="btn sm setbtn">Set</button></div>
+          <div class="aset" style="margin-top:4px"><label class="btn sm ghost upbtn" style="cursor:pointer;flex:1;text-align:center" title="Upload a CSV or PDF statement for this account">📤 Upload statement<input type="file" class="upfile hide" accept=".pdf,.csv,.txt"></label></div></div>
         <div class="alist">${c.rows.length ? c.rows.map(r => { const xfer = r.other || r.drawId; const m = r.manualId ? state.manual.find(x => x.id === r.manualId) : null; return `<div class="aitem ${r.paid ? 'done' : ''} ${r.overdue ? 'late' : ''}" data-skey="${esc(r.key)}"><div class="aday num">${ordinal(r.day)}</div><div class="alab" title="${esc(r.label)}${r.other ? ' ⇄ ' + esc(accName(r.other)) : ''}">${xfer ? '<span class="xf" title="Transfer between our accounts">⇄</span> ' : ''}${esc(r.label)}${r.other ? `<span class="ref"> ${r.amt < 0 ? '→' : '←'} ${esc(accName(r.other))}</span>` : ''}</div><div class="aamt num ${r.amt > 0 ? 'pos' : ''}">${r.paid ? '<span class="tick" title="Paid">✓</span>' : (r.future ? '' : '')}${gbp(r.amt, { sign: true })}</div><button class="amenu" title="Edit">⋯</button>
           <div class="aedit" hidden>
             ${m ? `<label class="small">${m.kind === 'transfer' ? 'From' : m.kind === 'income' ? 'Into' : 'From'} <select class="mfrom">${COL_ACCS.map(x => `<option value="${x}" ${x === (m.kind === 'income' ? m.to : m.from) ? 'selected' : ''}>${accName(x)}</option>`).join('')}</select></label>${m.kind === 'transfer' ? `<label class="small">To <select class="mto">${COL_ACCS.map(x => `<option value="${x}" ${x === m.to ? 'selected' : ''}>${accName(x)}</option>`).join('')}</select></label>` : ''}<label class="small">Amount <input class="eamt" type="number" step="0.01" value="${m.amount}"></label><label class="small">Date <input class="edate" type="date" value="${m.date}"></label><label class="small">What <input class="edesc" type="text" value="${esc(m.desc || '')}" style="width:140px"></label><label class="small"><input class="erep" type="checkbox" ${m.repeat ? 'checked' : ''}> Regular every month</label><button class="btn sm" data-act="msave">Save</button><button class="btn sm danger" data-act="mdel">Remove</button>`
@@ -2023,8 +2067,9 @@ function renderMonth(main) {
   $('#cmMonth').onchange = e => { view.monthYm = e.target.value; render(); };
   $$('.acol').forEach(colEl => {
     const acc = colEl.dataset.acc;
-    const inp = $('input.settoday', colEl); const doSet = () => { if (inp.value === '') return; state.balances[acc] = { amount: +inp.value, asOf: todayD }; persist(); render(); toast(accName(acc) + ' set to ' + gbp(+inp.value)); };
+    const inp = $('input.settoday', colEl); const doSet = () => { if (inp.value === '') return; state.balances[acc] = { amount: +inp.value, asOf: todayD, setAt: Date.now() }; persist(); render(); toast(accName(acc) + ' set to ' + gbp(+inp.value)); };
     $('button.setbtn', colEl).onclick = doSet; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); doSet(); } };
+    const upFile = $('input.upfile', colEl); if (upFile) upFile.onchange = e => handleAccountUpload(acc, e.target.files);
     $$('.aitem[data-skey]', colEl).forEach(it => {
       const item = cols.flatMap(c => c.rows).find(x => x.key === it.dataset.skey); const ed = $('.aedit', it); const mb = $('button.amenu', it); if (!mb || !ed || !item) return;
       mb.onclick = () => { ed.hidden = !ed.hidden; };
